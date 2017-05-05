@@ -12,9 +12,7 @@ POSTHOOK: Lineage: decimal_test.cbigint SIMPLE [(alltypesorc)alltypesorc.FieldSc
 POSTHOOK: Lineage: decimal_test.cdecimal1 EXPRESSION [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: decimal_test.cdecimal2 EXPRESSION [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
 POSTHOOK: Lineage: decimal_test.cdouble SIMPLE [(alltypesorc)alltypesorc.FieldSchema(name:cdouble, type:double, comment:null), ]
-PREHOOK: query: -- Test math functions in vectorized mode to verify they run correctly end-to-end.
-
-explain vectorization expression 
+PREHOOK: query: explain vectorization expression 
 select
    cdecimal1
   ,Round(cdecimal1, 2)
@@ -46,14 +44,12 @@ select
   -- Test nesting
   ,cos(-sin(log(cdecimal1)) + 3.14159)
 from decimal_test
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cdecimal1) >= -1.0
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Test math functions in vectorized mode to verify they run correctly end-to-end.
-
-explain vectorization expression 
+POSTHOOK: query: explain vectorization expression 
 select
    cdecimal1
   ,Round(cdecimal1, 2)
@@ -85,9 +81,9 @@ select
   -- Test nesting
   ,cos(-sin(log(cdecimal1)) + 3.14159)
 from decimal_test
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cdecimal1) >= -1.0
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -122,7 +118,7 @@ STAGE PLANS:
                     className: VectorSelectOperator
                     native: true
                     projectedOutputColumns: [2, 7, 8, 9, 10, 5, 11, 12, 13, 15, 6, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 2, 28, 4, 29]
-                    selectExpressions: FuncRoundWithNumDigitsDecimalToDecimal(col 2, decimalPlaces 2) -> 7:decimal(13,2), FuncRoundDecimalToDecimal(col 2) -> 8:decimal(11,0), FuncFloorDecimalToDecimal(col 2) -> 9:decimal(11,0), FuncCeilDecimalToDecimal(col 2) -> 10:decimal(11,0), RoundWithNumDigitsDoubleToDouble(col 6, decimalPlaces 58)(children: FuncExpDoubleToDouble(col 5)(children: CastDecimalToDouble(col 2) -> 5:double) -> 6:double) -> 5:double, FuncLnDoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 11:double, FuncLog10DoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 12:double, FuncLog2DoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 13:double, FuncLog2DoubleToDouble(col 6)(children: CastDecimalToDouble(col 14)(children: DecimalColSubtractDecimalScalar(col 2, val 15601) -> 14:decimal(21,10)) -> 6:double) -> 15:double, VectorUDFAdaptor(log(2, cdecimal1)) -> 6:Double, VectorUDFAdaptor(power(log2(cdecimal1), 2))(children: FuncLog2DoubleToDouble(col 16)(children: CastDecimalToDouble(col 2) -> 16:double) -> 17:double) -> 16:Double, VectorUDFAdaptor(power(log2(cdecimal1), 2))(children: FuncLog2DoubleToDouble(col 17)(children: CastDecimalToDouble(col 2) -> 17:double) -> 18:double) -> 17:Double, FuncSqrtDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 19:double, FuncAbsDecimalToDecimal(col 2) -> 20:decimal(20,10), FuncSinDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 21:double, FuncASinDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 22:double, FuncCosDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 23:double, FuncACosDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 24:double, FuncATanDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 25:double, FuncDegreesDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 26:double, FuncRadiansDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 27:double, FuncNegateDecimalToDecimal(col 2) -> 28:decimal(20,10), FuncSignDecimalToLong(col 2) -> 4:long, FuncCosDoubleToDouble(col 18)(children: DoubleColAddDoubleScalar(col 29, val 3.14159)(children: DoubleColUnaryMinus(col 18)(children: FuncSinDoubleToDouble(col 29)(children: FuncLnDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 29:double) -> 18:double) -> 29:double) -> 18:double) -> 29:double
+                    selectExpressions: FuncRoundWithNumDigitsDecimalToDecimal(col 2, decimalPlaces 2) -> 7:decimal(13,2), FuncRoundDecimalToDecimal(col 2) -> 8:decimal(11,0), FuncFloorDecimalToDecimal(col 2) -> 9:decimal(11,0), FuncCeilDecimalToDecimal(col 2) -> 10:decimal(11,0), RoundWithNumDigitsDoubleToDouble(col 6, decimalPlaces 58)(children: FuncExpDoubleToDouble(col 5)(children: CastDecimalToDouble(col 2) -> 5:double) -> 6:double) -> 5:double, FuncLnDoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 11:double, FuncLog10DoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 12:double, FuncLog2DoubleToDouble(col 6)(children: CastDecimalToDouble(col 2) -> 6:double) -> 13:double, FuncLog2DoubleToDouble(col 6)(children: CastDecimalToDouble(col 14)(children: DecimalColSubtractDecimalScalar(col 2, val 15601) -> 14:decimal(21,10)) -> 6:double) -> 15:double, VectorUDFAdaptor(log(2, cdecimal1)) -> 6:double, VectorUDFAdaptor(power(log2(cdecimal1), 2))(children: FuncLog2DoubleToDouble(col 16)(children: CastDecimalToDouble(col 2) -> 16:double) -> 17:double) -> 16:double, VectorUDFAdaptor(power(log2(cdecimal1), 2))(children: FuncLog2DoubleToDouble(col 17)(children: CastDecimalToDouble(col 2) -> 17:double) -> 18:double) -> 17:double, FuncSqrtDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 19:double, FuncAbsDecimalToDecimal(col 2) -> 20:decimal(20,10), FuncSinDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 21:double, FuncASinDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 22:double, FuncCosDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 23:double, FuncACosDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 24:double, FuncATanDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 25:double, FuncDegreesDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 26:double, FuncRadiansDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 27:double, FuncNegateDecimalToDecimal(col 2) -> 28:decimal(20,10), FuncSignDecimalToLong(col 2) -> 4:int, FuncCosDoubleToDouble(col 18)(children: DoubleColAddDoubleScalar(col 29, val 3.14159)(children: DoubleColUnaryMinus(col 18)(children: FuncSinDoubleToDouble(col 29)(children: FuncLnDoubleToDouble(col 18)(children: CastDecimalToDouble(col 2) -> 18:double) -> 29:double) -> 18:double) -> 29:double) -> 18:double) -> 29:double
                 Statistics: Num rows: 2048 Data size: 366958 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
@@ -181,9 +177,9 @@ PREHOOK: query: select
   -- Test nesting
   ,cos(-sin(log(cdecimal1)) + 3.14159)
 from decimal_test
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cdecimal1) >= -1.0
 PREHOOK: type: QUERY
 PREHOOK: Input: default@decimal_test
@@ -219,9 +215,9 @@ POSTHOOK: query: select
   -- Test nesting
   ,cos(-sin(log(cdecimal1)) + 3.14159)
 from decimal_test
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cdecimal1) >= -1.0
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@decimal_test

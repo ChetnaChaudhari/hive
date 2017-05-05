@@ -1,10 +1,8 @@
-PREHOOK: query: -- Taken from groupby2.q
-CREATE TABLE dest_g2(key STRING, c1 INT, c2 STRING) STORED AS TEXTFILE
+PREHOOK: query: CREATE TABLE dest_g2(key STRING, c1 INT, c2 STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@dest_g2
-POSTHOOK: query: -- Taken from groupby2.q
-CREATE TABLE dest_g2(key STRING, c1 INT, c2 STRING) STORED AS TEXTFILE
+POSTHOOK: query: CREATE TABLE dest_g2(key STRING, c1 INT, c2 STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest_g2
@@ -131,7 +129,7 @@ STAGE PLANS:
               sort order: 
               Map-reduce partition columns: rand() (type: double)
               Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
-              value expressions: key (type: string), 16 (type: int), c1 (type: int), c2 (type: string)
+              value expressions: key (type: string), c1 (type: int), c2 (type: string)
       Reduce Operator Tree:
         Group By Operator
           aggregations: compute_stats(VALUE._col0, 16), compute_stats(VALUE._col2, 16), compute_stats(VALUE._col3, 16)

@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 
 import org.antlr.runtime.tree.Tree;
@@ -53,10 +54,12 @@ import org.apache.hadoop.hive.ql.QueryProperties;
 import org.apache.hadoop.hive.ql.QueryState;
 import org.apache.hadoop.hive.ql.exec.FetchTask;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.hooks.WriteEntity;
+import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -67,16 +70,20 @@ import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
 import org.apache.hadoop.hive.ql.optimizer.listbucketingpruner.ListBucketingPrunerUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.FetchWork;
 import org.apache.hadoop.hive.ql.plan.FileSinkDesc;
 import org.apache.hadoop.hive.ql.plan.ListBucketingCtx;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
+import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
+import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.hadoop.mapred.TextInputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,14 +115,14 @@ public abstract class BaseSemanticAnalyzer {
    * back and set it once we actually start running the query.
    */
   protected Set<FileSinkDesc> acidFileSinks = new HashSet<FileSinkDesc>();
-  
+
   // whether any ACID table is involved in a query
   protected boolean acidInQuery;
 
-  public static int HIVE_COLUMN_ORDER_ASC = 1;
-  public static int HIVE_COLUMN_ORDER_DESC = 0;
-  public static int HIVE_COLUMN_NULLS_FIRST = 0;
-  public static int HIVE_COLUMN_NULLS_LAST = 1;
+  public static final int HIVE_COLUMN_ORDER_ASC = 1;
+  public static final int HIVE_COLUMN_ORDER_DESC = 0;
+  public static final int HIVE_COLUMN_NULLS_FIRST = 0;
+  public static final int HIVE_COLUMN_NULLS_LAST = 1;
 
   /**
    * ReadEntities that are passed to the hooks.
@@ -644,22 +651,22 @@ public abstract class BaseSemanticAnalyzer {
    */
   private static void processPrimaryKeyInfos(
     ASTNode child, List<PKInfo> pkInfos) throws SemanticException {
-    if (child.getChildCount() < 6) {
+    if (child.getChildCount() < 4) {
       throw new SemanticException(ErrorMsg.INVALID_PK_SYNTAX.getMsg());
     }
     // The ANTLR grammar looks like :
     // 1. KW_CONSTRAINT idfr=identifier KW_PRIMARY KW_KEY pkCols=columnParenthesesList
     //  enableSpec=enableSpecification validateSpec=validateSpecification relySpec=relySpecification
     // -> ^(TOK_PRIMARY_KEY $pkCols $idfr $relySpec $enableSpec $validateSpec)
-    // when the user specifies the constraint name (i.e. child.getChildCount() == 7)
+    // when the user specifies the constraint name (i.e. child.getChildCount() == 5)
     // 2.  KW_PRIMARY KW_KEY columnParenthesesList
     // enableSpec=enableSpecification validateSpec=validateSpecification relySpec=relySpecification
     // -> ^(TOK_PRIMARY_KEY columnParenthesesList $relySpec $enableSpec $validateSpec)
-    // when the user does not specify the constraint name (i.e. child.getChildCount() == 6)
-    boolean userSpecifiedConstraintName = child.getChildCount() == 7;
-    int relyIndex =  child.getChildCount() == 7 ? 4 : 3;
-    for (int j = 0; j < child.getChild(1).getChildCount(); j++) {
-     Tree grandChild = child.getChild(1).getChild(j);
+    // when the user does not specify the constraint name (i.e. child.getChildCount() == 4)
+    boolean userSpecifiedConstraintName = child.getChildCount() == 5;
+    int relyIndex =  child.getChildCount() == 5 ? 2 : 1;
+    for (int j = 0; j < child.getChild(0).getChildCount(); j++) {
+     Tree grandChild = child.getChild(0).getChild(j);
      boolean rely = child.getChild(relyIndex).getType() == HiveParser.TOK_VALIDATE;
      boolean enable =  child.getChild(relyIndex+1).getType() == HiveParser.TOK_ENABLE;
      boolean validate =  child.getChild(relyIndex+2).getType() == HiveParser.TOK_VALIDATE;
@@ -676,7 +683,7 @@ public abstract class BaseSemanticAnalyzer {
        new PKInfo(
          unescapeIdentifier(grandChild.getText().toLowerCase()),
          (userSpecifiedConstraintName ?
-         unescapeIdentifier(child.getChild(3).getText().toLowerCase()) : null),
+         unescapeIdentifier(child.getChild(1).getText().toLowerCase()) : null),
          rely));
     }
   }
@@ -718,11 +725,11 @@ public abstract class BaseSemanticAnalyzer {
    */
   protected static void processPrimaryKeys(ASTNode parent, ASTNode child, List<SQLPrimaryKey> primaryKeys)
     throws SemanticException {
-    int relyIndex = 4;
+    int relyIndex = 2;
     int cnt = 1;
     String[] qualifiedTabName = getQualifiedTableName((ASTNode) parent.getChild(0));
-    for (int j = 0; j < child.getChild(1).getChildCount(); j++) {
-     Tree grandChild = child.getChild(1).getChild(j);
+    for (int j = 0; j < child.getChild(0).getChildCount(); j++) {
+     Tree grandChild = child.getChild(0).getChild(j);
      boolean rely = child.getChild(relyIndex).getType() == HiveParser.TOK_VALIDATE;
      boolean enable =  child.getChild(relyIndex+1).getType() == HiveParser.TOK_ENABLE;
      boolean validate =  child.getChild(relyIndex+2).getType() == HiveParser.TOK_VALIDATE;
@@ -739,7 +746,7 @@ public abstract class BaseSemanticAnalyzer {
          qualifiedTabName[0], qualifiedTabName[1],
          unescapeIdentifier(grandChild.getText().toLowerCase()),
          cnt++,
-         unescapeIdentifier(child.getChild(3).getText().toLowerCase()), false, false,
+         unescapeIdentifier(child.getChild(1).getText().toLowerCase()), false, false,
          rely));
     }
   }
@@ -756,20 +763,20 @@ public abstract class BaseSemanticAnalyzer {
     String[] qualifiedTabName = getQualifiedTableName((ASTNode) parent.getChild(0));
     // The ANTLR grammar looks like :
     // 1.  KW_CONSTRAINT idfr=identifier KW_FOREIGN KW_KEY fkCols=columnParenthesesList
-    // KW_REFERENCES tabName=tableName parCols=columnParenthesesList 
+    // KW_REFERENCES tabName=tableName parCols=columnParenthesesList
     // enableSpec=enableSpecification validateSpec=validateSpecification relySpec=relySpecification
     // -> ^(TOK_FOREIGN_KEY $idfr $fkCols $tabName $parCols $relySpec $enableSpec $validateSpec)
-    // when the user specifies the constraint name (i.e. child.getChildCount() == 11)
+    // when the user specifies the constraint name (i.e. child.getChildCount() == 7)
     // 2.  KW_FOREIGN KW_KEY fkCols=columnParenthesesList
     // KW_REFERENCES tabName=tableName parCols=columnParenthesesList
     // enableSpec=enableSpecification validateSpec=validateSpecification relySpec=relySpecification
     // -> ^(TOK_FOREIGN_KEY $fkCols  $tabName $parCols $relySpec $enableSpec $validateSpec)
-    // when the user does not specify the constraint name (i.e. child.getChildCount() == 10)
-    boolean userSpecifiedConstraintName = child.getChildCount() == 11;
-    int fkIndex = userSpecifiedConstraintName ? 2 : 1;
-    int pkIndex = userSpecifiedConstraintName ? 6 : 5;
-    int ptIndex = userSpecifiedConstraintName ? 4 : 3;
-    int relyIndex =  child.getChildCount() == 11 ? 8 : 7;
+    // when the user does not specify the constraint name (i.e. child.getChildCount() == 6)
+    boolean userSpecifiedConstraintName = child.getChildCount() == 7;
+    int fkIndex = userSpecifiedConstraintName ? 1 : 0;
+    int ptIndex = fkIndex + 1;
+    int pkIndex = ptIndex + 1;
+    int relyIndex = pkIndex + 1;
 
     if (child.getChildCount() <= fkIndex ||child.getChildCount() <= pkIndex ||
       child.getChildCount() <= ptIndex) {
@@ -1000,6 +1007,23 @@ public abstract class BaseSemanticAnalyzer {
       }
     }
 
+    public TableSpec(Table tableHandle, List<Partition> partitions)
+        throws HiveException {
+      this.tableHandle = tableHandle;
+      this.tableName = tableHandle.getTableName();
+      if (partitions != null && !partitions.isEmpty()) {
+        this.specType = SpecType.STATIC_PARTITION;
+        this.partitions = partitions;
+        List<FieldSchema> partCols = this.tableHandle.getPartCols();
+        this.partSpec = new LinkedHashMap<>();
+        for (FieldSchema partCol : partCols) {
+          partSpec.put(partCol.getName(), null);
+        }
+      } else {
+        this.specType = SpecType.TABLE_ONLY;
+      }
+    }
+
     public TableSpec(Hive db, HiveConf conf, ASTNode ast, boolean allowDynamicPartitionsSpec,
         boolean allowPartialPartitionsSpec) throws SemanticException {
       assert (ast.getToken().getType() == HiveParser.TOK_TAB
@@ -1149,7 +1173,6 @@ public abstract class BaseSemanticAnalyzer {
     private List<String> colType;
     private boolean tblLvl;
 
-
     public String getTableName() {
       return tableName;
     }
@@ -1181,6 +1204,7 @@ public abstract class BaseSemanticAnalyzer {
     public void setColType(List<String> colType) {
       this.colType = colType;
     }
+
   }
 
   /**
@@ -1324,7 +1348,7 @@ public abstract class BaseSemanticAnalyzer {
   public Set<FileSinkDesc> getAcidFileSinks() {
     return acidFileSinks;
   }
-  
+
   public boolean hasAcidInQuery() {
     return acidInQuery;
   }
@@ -1607,8 +1631,12 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   protected WriteEntity toWriteEntity(Path location) throws SemanticException {
+    return toWriteEntity(location,conf);
+  }
+
+  public static WriteEntity toWriteEntity(Path location, HiveConf conf) throws SemanticException {
     try {
-      Path path = tryQualifyPath(location);
+      Path path = tryQualifyPath(location,conf);
       return new WriteEntity(path, FileUtils.isLocalFile(conf, path.toUri()));
     } catch (Exception e) {
       throw new SemanticException(e);
@@ -1620,8 +1648,12 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   protected ReadEntity toReadEntity(Path location) throws SemanticException {
+    return toReadEntity(location, conf);
+  }
+
+  public static ReadEntity toReadEntity(Path location, HiveConf conf) throws SemanticException {
     try {
-      Path path = tryQualifyPath(location);
+      Path path = tryQualifyPath(location, conf);
       return new ReadEntity(path, FileUtils.isLocalFile(conf, path.toUri()));
     } catch (Exception e) {
       throw new SemanticException(e);
@@ -1629,6 +1661,10 @@ public abstract class BaseSemanticAnalyzer {
   }
 
   private Path tryQualifyPath(Path path) throws IOException {
+    return tryQualifyPath(path,conf);
+  }
+
+  public static Path tryQualifyPath(Path path, HiveConf conf) throws IOException {
     try {
       return path.getFileSystem(conf).makeQualified(path);
     } catch (IOException e) {
@@ -1732,7 +1768,29 @@ public abstract class BaseSemanticAnalyzer {
   public HashSet<WriteEntity> getAllOutputs() {
     return outputs;
   }
+
   public QueryState getQueryState() {
     return queryState;
+  }
+
+  /**
+   * Create a FetchTask for a given schema.
+   *
+   * @param schema string
+   */
+  protected FetchTask createFetchTask(String schema) {
+    Properties prop = new Properties();
+    // Sets delimiter to tab (ascii 9)
+    prop.setProperty(serdeConstants.SERIALIZATION_FORMAT, Integer.toString(Utilities.tabCode));
+    prop.setProperty(serdeConstants.SERIALIZATION_NULL_FORMAT, " ");
+    String[] colTypes = schema.split("#");
+    prop.setProperty("columns", colTypes[0]);
+    prop.setProperty("columns.types", colTypes[1]);
+    prop.setProperty(serdeConstants.SERIALIZATION_LIB, LazySimpleSerDe.class.getName());
+    FetchWork fetch =
+        new FetchWork(ctx.getResFile(), new TableDesc(TextInputFormat.class,
+            IgnoreKeyTextOutputFormat.class, prop), -1);
+    fetch.setSerializationNullFormat(" ");
+    return (FetchTask) TaskFactory.get(fetch, conf);
   }
 }

@@ -150,6 +150,25 @@ public class VectorExtractRow {
   }
 
   /*
+   * Initialize using an ObjectInspector array and a column projection array.
+   */
+  public void init(TypeInfo[] typeInfos, int[] projectedColumns)
+      throws HiveException {
+
+    final int count = typeInfos.length;
+    allocateArrays(count);
+
+    for (int i = 0; i < count; i++) {
+
+      int projectionColumnNum = projectedColumns[i];
+
+      TypeInfo typeInfo = typeInfos[i];
+
+      initEntry(i, projectionColumnNum, typeInfo);
+    }
+  }
+
+  /*
    * Initialize using data type names.
    * No projection -- the column range 0 .. types.size()-1
    */
@@ -306,12 +325,14 @@ public class VectorExtractRow {
                 maxLengths[logicalColumnIndex]);
 
             HiveCharWritable hiveCharWritable = (HiveCharWritable) primitiveWritable;
-            hiveCharWritable.set(new String(bytes, start, adjustedLength, Charsets.UTF_8), -1);
+            hiveCharWritable.set(new String(bytes, start, adjustedLength, Charsets.UTF_8),
+                maxLengths[logicalColumnIndex]);
             return primitiveWritable;
           }
         case DECIMAL:
+          // The HiveDecimalWritable set method will quickly copy the deserialized decimal writable fields.
           ((HiveDecimalWritable) primitiveWritable).set(
-              ((DecimalColumnVector) batch.cols[projectionColumnNum]).vector[adjustedIndex].getHiveDecimal());
+              ((DecimalColumnVector) batch.cols[projectionColumnNum]).vector[adjustedIndex]);
           return primitiveWritable;
         case INTERVAL_YEAR_MONTH:
           ((HiveIntervalYearMonthWritable) primitiveWritable).set(

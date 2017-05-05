@@ -1,11 +1,9 @@
-PREHOOK: query: -- Using cint and ctinyint in test queries
-create table small_alltypesorc1a as select * from alltypesorc where cint is not null and ctinyint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
+PREHOOK: query: create table small_alltypesorc1a as select * from alltypesorc where cint is not null and ctinyint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@alltypesorc
 PREHOOK: Output: database:default
 PREHOOK: Output: default@small_alltypesorc1a
-POSTHOOK: query: -- Using cint and ctinyint in test queries
-create table small_alltypesorc1a as select * from alltypesorc where cint is not null and ctinyint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
+POSTHOOK: query: create table small_alltypesorc1a as select * from alltypesorc where cint is not null and ctinyint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@alltypesorc
 POSTHOOK: Output: database:default
@@ -246,7 +244,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: cd
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -257,7 +255,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       Spark Hash Table Sink Vectorization:
                           className: VectorSparkHashTableSinkOperator
@@ -290,7 +288,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -301,7 +299,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Map Join Operator
                       condition map:
                            Left Outer Join0 to 1
@@ -315,19 +313,19 @@ STAGE PLANS:
                           bigTableValueColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
                           className: VectorMapJoinOuterLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                          nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                           projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
                           smallTableMapping: [12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23]
                       outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5, _col6, _col7, _col8, _col9, _col10, _col11, _col12, _col13, _col14, _col15, _col16, _col17, _col18, _col19, _col20, _col21, _col22, _col23
                       input vertices:
                         1 Map 2
-                      Statistics: Num rows: 16 Data size: 4403 Basic stats: COMPLETE Column stats: NONE
+                      Statistics: Num rows: 16 Data size: 4436 Basic stats: COMPLETE Column stats: NONE
                       File Output Operator
                         compressed: false
                         File Sink Vectorization:
                             className: VectorFileSinkOperator
                             native: false
-                        Statistics: Num rows: 16 Data size: 4403 Basic stats: COMPLETE Column stats: NONE
+                        Statistics: Num rows: 16 Data size: 4436 Basic stats: COMPLETE Column stats: NONE
                         table:
                             input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                             output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -346,7 +344,7 @@ STAGE PLANS:
                     includeColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
                     dataColumns: ctinyint:tinyint, csmallint:smallint, cint:int, cbigint:bigint, cfloat:float, cdouble:double, cstring1:string, cstring2:string, ctimestamp1:timestamp, ctimestamp2:timestamp, cboolean1:boolean, cboolean2:boolean
                     partitionColumnCount: 0
-                    scratchColumnTypeNames: bigint, bigint, bigint, bigint, Double, Double, String, String, Timestamp, Timestamp, bigint, bigint
+                    scratchColumnTypeNames: bigint, bigint, bigint, bigint, double, double, string, string, timestamp, timestamp, bigint, bigint
             Local Work:
               Map Reduce Local Work
 
@@ -356,18 +354,14 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-select * 
+PREHOOK: query: select * 
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint
 PREHOOK: type: QUERY
 PREHOOK: Input: default@small_alltypesorc_a
 #### A masked pattern was here ####
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-select * 
+POSTHOOK: query: select * 
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint
@@ -423,7 +417,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: hd
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -434,7 +428,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       Spark Hash Table Sink Vectorization:
                           className: VectorSparkHashTableSinkOperator
@@ -467,7 +461,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -478,7 +472,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Map Join Operator
                       condition map:
                            Left Outer Join0 to 1
@@ -491,18 +485,18 @@ STAGE PLANS:
                           bigTableValueColumns: [0]
                           className: VectorMapJoinOuterLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                          nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                           projectedOutputColumns: [0]
                       outputColumnNames: _col0
                       input vertices:
                         1 Map 2
-                      Statistics: Num rows: 16 Data size: 4403 Basic stats: COMPLETE Column stats: NONE
+                      Statistics: Num rows: 16 Data size: 4436 Basic stats: COMPLETE Column stats: NONE
                       File Output Operator
                         compressed: false
                         File Sink Vectorization:
                             className: VectorFileSinkOperator
                             native: false
-                        Statistics: Num rows: 16 Data size: 4403 Basic stats: COMPLETE Column stats: NONE
+                        Statistics: Num rows: 16 Data size: 4436 Basic stats: COMPLETE Column stats: NONE
                         table:
                             input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                             output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
@@ -530,18 +524,14 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-select c.ctinyint 
+PREHOOK: query: select c.ctinyint 
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a hd
   on hd.ctinyint = c.ctinyint
 PREHOOK: type: QUERY
 PREHOOK: Input: default@small_alltypesorc_a
 #### A masked pattern was here ####
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-select c.ctinyint 
+POSTHOOK: query: select c.ctinyint 
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a hd
   on hd.ctinyint = c.ctinyint
@@ -689,7 +679,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: cd
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -700,7 +690,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [2]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       Spark Hash Table Sink Vectorization:
                           className: VectorSparkHashTableSinkOperator
@@ -728,7 +718,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: hd
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -739,7 +729,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Spark HashTable Sink Operator
                       Spark Hash Table Sink Vectorization:
                           className: VectorSparkHashTableSinkOperator
@@ -774,7 +764,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: c
-                  Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                  Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
                       projectedOutputColumns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -785,7 +775,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0, 2]
-                    Statistics: Num rows: 15 Data size: 4003 Basic stats: COMPLETE Column stats: NONE
+                    Statistics: Num rows: 15 Data size: 4033 Basic stats: COMPLETE Column stats: NONE
                     Map Join Operator
                       condition map:
                            Left Outer Join0 to 1
@@ -798,12 +788,12 @@ STAGE PLANS:
                           bigTableValueColumns: [0]
                           className: VectorMapJoinOuterLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                          nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                           projectedOutputColumns: [0]
                       outputColumnNames: _col0
                       input vertices:
                         1 Map 3
-                      Statistics: Num rows: 16 Data size: 4403 Basic stats: COMPLETE Column stats: NONE
+                      Statistics: Num rows: 16 Data size: 4436 Basic stats: COMPLETE Column stats: NONE
                       Map Join Operator
                         condition map:
                              Left Outer Join0 to 1
@@ -816,12 +806,12 @@ STAGE PLANS:
                             bigTableValueColumns: [0]
                             className: VectorMapJoinOuterLongOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                             projectedOutputColumns: [0]
                         outputColumnNames: _col0
                         input vertices:
                           1 Map 4
-                        Statistics: Num rows: 17 Data size: 4843 Basic stats: COMPLETE Column stats: NONE
+                        Statistics: Num rows: 17 Data size: 4879 Basic stats: COMPLETE Column stats: NONE
                         Group By Operator
                           aggregations: count(), sum(_col0)
                           Group By Vectorization:
@@ -836,10 +826,9 @@ STAGE PLANS:
                           Reduce Output Operator
                             sort order: 
                             Reduce Sink Vectorization:
-                                className: VectorReduceSinkOperator
-                                native: false
-                                nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                                nativeConditionsNotMet: Uniform Hash IS false
+                                className: VectorReduceSinkObjectHashOperator
+                                native: true
+                                nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                             Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: bigint), _col1 (type: bigint)
             Execution mode: vectorized
@@ -863,6 +852,8 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine spark IN [tez, spark] IS true
+                reduceColumnNullOrder: 
+                reduceColumnSortOrder: 
                 groupByVectorOutput: true
                 allNative: false
                 usesVectorUDFAdaptor: false
@@ -900,9 +891,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-select count(*), sum(t1.c_ctinyint) from (select c.ctinyint as c_ctinyint
+PREHOOK: query: select count(*), sum(t1.c_ctinyint) from (select c.ctinyint as c_ctinyint
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint 
@@ -912,9 +901,7 @@ left outer join small_alltypesorc_a hd
 PREHOOK: type: QUERY
 PREHOOK: Input: default@small_alltypesorc_a
 #### A masked pattern was here ####
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-select count(*), sum(t1.c_ctinyint) from (select c.ctinyint as c_ctinyint
+POSTHOOK: query: select count(*), sum(t1.c_ctinyint) from (select c.ctinyint as c_ctinyint
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint 

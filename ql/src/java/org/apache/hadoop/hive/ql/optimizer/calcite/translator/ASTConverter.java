@@ -23,6 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.calcite.adapter.druid.DruidQuery;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelVisitor;
@@ -57,8 +58,9 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
 import org.apache.hadoop.hive.ql.optimizer.calcite.CalciteSemanticException;
-import org.apache.hadoop.hive.ql.optimizer.calcite.druid.DruidQuery;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveAggregate;
+import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveExtractDate;
+import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveFloorDate;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveGroupingID;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveSortLimit;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveTableFunctionScan;
@@ -339,11 +341,15 @@ public class ASTConverter {
   }
 
   private QueryBlockInfo convertSource(RelNode r) throws CalciteSemanticException {
-    Schema s;
-    ASTNode ast;
+    Schema s = null;
+    ASTNode ast = null;
 
     if (r instanceof TableScan) {
       TableScan f = (TableScan) r;
+      s = new Schema(f);
+      ast = ASTBuilder.table(f);
+    } else if (r instanceof DruidQuery) {
+      DruidQuery f = (DruidQuery) r;
       s = new Schema(f);
       ast = ASTBuilder.table(f);
     } else if (r instanceof Join) {
@@ -353,7 +359,8 @@ public class ASTConverter {
       s = new Schema(left.schema, right.schema);
       ASTNode cond = join.getCondition().accept(new RexVisitor(s));
       boolean semiJoin = join instanceof SemiJoin;
-      if (join.getRight() instanceof Join) {
+      if (join.getRight() instanceof Join && !semiJoin) {
+          // should not be done for semijoin since it will change the semantics
         // Invert join inputs; this is done because otherwise the SemanticAnalyzer
         // methods to merge joins will not kick in
         JoinRelType type;
@@ -372,19 +379,15 @@ public class ASTConverter {
         s = left.schema;
       }
     } else if (r instanceof Union) {
-      RelNode leftInput = ((Union) r).getInput(0);
-      RelNode rightInput = ((Union) r).getInput(1);
-
-      ASTConverter leftConv = new ASTConverter(leftInput, this.derivedTableCount);
-      ASTConverter rightConv = new ASTConverter(rightInput, this.derivedTableCount);
-      ASTNode leftAST = leftConv.convert();
-      ASTNode rightAST = rightConv.convert();
-
-      ASTNode unionAST = getUnionAllAST(leftAST, rightAST);
-
-      String sqAlias = nextAlias();
-      ast = ASTBuilder.subQuery(unionAST, sqAlias);
-      s = new Schema((Union) r, sqAlias);
+      Union u = ((Union) r);
+      ASTNode left = new ASTConverter(((Union) r).getInput(0), this.derivedTableCount).convert();
+      for (int ind = 1; ind < u.getInputs().size(); ind++) {
+        left = getUnionAllAST(left, new ASTConverter(((Union) r).getInput(ind),
+            this.derivedTableCount).convert());
+        String sqAlias = nextAlias();
+        ast = ASTBuilder.subQuery(left, sqAlias);
+        s = new Schema((Union) r, sqAlias);
+      }
     } else {
       ASTConverter src = new ASTConverter(r, this.derivedTableCount);
       ASTNode srcAST = src.convert();
@@ -425,7 +428,8 @@ public class ASTConverter {
     @Override
     public void visit(RelNode node, int ordinal, RelNode parent) {
 
-      if (node instanceof TableScan) {
+      if (node instanceof TableScan ||
+          node instanceof DruidQuery) {
         ASTConverter.this.from = node;
       } else if (node instanceof Filter) {
         handle((Filter) node);
@@ -645,14 +649,30 @@ public class ASTConverter {
         astNodeLst.add(astBldr.node());
       }
 
-      for (RexNode operand : call.operands) {
-        astNodeLst.add(operand.accept(this));
+      if (op.kind == SqlKind.EXTRACT) {
+        // Extract on date: special handling since function in Hive does
+        // include <time_unit>. Observe that <time_unit> information
+        // is implicit in the function name, thus translation will
+        // proceed correctly if we just ignore the <time_unit>
+        astNodeLst.add(call.operands.get(1).accept(this));
+      } else if (op.kind == SqlKind.FLOOR &&
+              call.operands.size() == 2) {
+        // Floor on date: special handling since function in Hive does
+        // include <time_unit>. Observe that <time_unit> information
+        // is implicit in the function name, thus translation will
+        // proceed correctly if we just ignore the <time_unit>
+        astNodeLst.add(call.operands.get(0).accept(this));
+      } else {
+        for (RexNode operand : call.operands) {
+          astNodeLst.add(operand.accept(this));
+        }
       }
 
-      if (isFlat(call))
+      if (isFlat(call)) {
         return SqlFunctionConverter.buildAST(op, astNodeLst, 0);
-      else
+      } else {
         return SqlFunctionConverter.buildAST(op, astNodeLst);
+      }
     }
   }
 
@@ -675,14 +695,17 @@ public class ASTConverter {
     private static final long serialVersionUID = 1L;
 
     Schema(TableScan scan) {
-      HiveTableScan hts;
-      if (scan instanceof DruidQuery) {
-        hts = (HiveTableScan) ((DruidQuery)scan).getTableScan();
-      } else {
-        hts = (HiveTableScan) scan;
-      }
+      HiveTableScan hts = (HiveTableScan) scan;
       String tabName = hts.getTableAlias();
       for (RelDataTypeField field : scan.getRowType().getFieldList()) {
+        add(new ColumnInfo(tabName, field.getName()));
+      }
+    }
+
+    Schema(DruidQuery dq) {
+      HiveTableScan hts = (HiveTableScan) ((DruidQuery)dq).getTableScan();
+      String tabName = hts.getTableAlias();
+      for (RelDataTypeField field : dq.getRowType().getFieldList()) {
         add(new ColumnInfo(tabName, field.getName()));
       }
     }

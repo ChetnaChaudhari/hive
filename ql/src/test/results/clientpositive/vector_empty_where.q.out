@@ -1,9 +1,7 @@
-PREHOOK: query: -- HIVE-
-explain vectorization expression
+PREHOOK: query: explain vectorization expression
 select count (distinct cint) from alltypesorc where cstring1
 PREHOOK: type: QUERY
-POSTHOOK: query: -- HIVE-
-explain vectorization expression
+POSTHOOK: query: explain vectorization expression
 select count (distinct cint) from alltypesorc where cstring1
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -58,8 +56,8 @@ STAGE PLANS:
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkOperator
                         native: false
-                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, Uniform Hash IS false, No DISTINCT columns IS false
+                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, No DISTINCT columns IS false
                     Statistics: Num rows: 6144 Data size: 1320982 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized
       Map Vectorization:
@@ -77,6 +75,10 @@ STAGE PLANS:
       Reduce Operator Tree:
         Group By Operator
           aggregations: count(DISTINCT KEY._col0:0._col0)
+          Group By Vectorization:
+              vectorOutput: false
+              native: false
+              projectedOutputColumns: null
           mode: mergepartial
           outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
@@ -153,8 +155,8 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkOperator
                       native: false
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                      nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, Uniform Hash IS false, No DISTINCT columns IS false
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, No DISTINCT columns IS false
                   Statistics: Num rows: 6144 Data size: 1320982 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized
       Map Vectorization:
@@ -172,6 +174,10 @@ STAGE PLANS:
       Reduce Operator Tree:
         Group By Operator
           aggregations: count(DISTINCT KEY._col0:0._col0)
+          Group By Vectorization:
+              vectorOutput: false
+              native: false
+              projectedOutputColumns: null
           mode: mergepartial
           outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
@@ -256,8 +262,8 @@ STAGE PLANS:
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkOperator
                         native: false
-                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, Uniform Hash IS false, No DISTINCT columns IS false
+                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, No DISTINCT columns IS false
                     Statistics: Num rows: 6144 Data size: 1320982 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized
       Map Vectorization:
@@ -275,6 +281,10 @@ STAGE PLANS:
       Reduce Operator Tree:
         Group By Operator
           aggregations: count(DISTINCT KEY._col0:0._col0)
+          Group By Vectorization:
+              vectorOutput: false
+              native: false
+              projectedOutputColumns: null
           mode: mergepartial
           outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
@@ -359,8 +369,8 @@ STAGE PLANS:
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkOperator
                         native: false
-                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, Uniform Hash IS false, No DISTINCT columns IS false
+                        nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, No TopN IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                        nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, No DISTINCT columns IS false
                     Statistics: Num rows: 6144 Data size: 1320982 Basic stats: COMPLETE Column stats: NONE
       Execution mode: vectorized
       Map Vectorization:
@@ -378,6 +388,10 @@ STAGE PLANS:
       Reduce Operator Tree:
         Group By Operator
           aggregations: count(DISTINCT KEY._col0:0._col0)
+          Group By Vectorization:
+              vectorOutput: false
+              native: false
+              projectedOutputColumns: null
           mode: mergepartial
           outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE

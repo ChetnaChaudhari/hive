@@ -1,11 +1,8 @@
-PREHOOK: query: -- Based on display_colstats_tbllvl.q, output should be almost exactly the same.
-DROP TABLE IF EXISTS UserVisits_web_text_none
+PREHOOK: query: DROP TABLE IF EXISTS UserVisits_web_text_none
 PREHOOK: type: DROPTABLE
-POSTHOOK: query: -- Based on display_colstats_tbllvl.q, output should be almost exactly the same.
-DROP TABLE IF EXISTS UserVisits_web_text_none
+POSTHOOK: query: DROP TABLE IF EXISTS UserVisits_web_text_none
 POSTHOOK: type: DROPTABLE
-PREHOOK: query: -- Hack, set external location because generated filename changes during test runs
-CREATE TEMPORARY EXTERNAL TABLE UserVisits_web_text_none (
+PREHOOK: query: CREATE TEMPORARY EXTERNAL TABLE UserVisits_web_text_none (
   sourceIP string,
   destURL string,
   visitDate string,
@@ -21,8 +18,7 @@ PREHOOK: type: CREATETABLE
 #### A masked pattern was here ####
 PREHOOK: Output: database:default
 PREHOOK: Output: default@UserVisits_web_text_none
-POSTHOOK: query: -- Hack, set external location because generated filename changes during test runs
-CREATE TEMPORARY EXTERNAL TABLE UserVisits_web_text_none (
+POSTHOOK: query: CREATE TEMPORARY EXTERNAL TABLE UserVisits_web_text_none (
   sourceIP string,
   destURL string,
   visitDate string,
@@ -80,8 +76,8 @@ STAGE PLANS:
             alias: uservisits_web_text_none
             Statistics: Num rows: 65 Data size: 7060 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions: sourceip (type: string), avgtimeonsite (type: int), adrevenue (type: float)
-              outputColumnNames: sourceip, avgtimeonsite, adrevenue
+              expressions: sourceip (type: string), adrevenue (type: float), avgtimeonsite (type: int)
+              outputColumnNames: sourceip, adrevenue, avgtimeonsite
               Statistics: Num rows: 65 Data size: 7060 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(sourceip, 16), compute_stats(avgtimeonsite, 16), compute_stats(adrevenue, 16)
@@ -132,8 +128,8 @@ STAGE PLANS:
             Statistics: Num rows: 65 Data size: 7060 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Select Operator
-              expressions: sourceip (type: string), avgtimeonsite (type: int), adrevenue (type: float)
-              outputColumnNames: sourceip, avgtimeonsite, adrevenue
+              expressions: sourceip (type: string), adrevenue (type: float), avgtimeonsite (type: int)
+              outputColumnNames: sourceip, adrevenue, avgtimeonsite
               Statistics: Num rows: 65 Data size: 7060 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(sourceip, 16), compute_stats(avgtimeonsite, 16), compute_stats(adrevenue, 16)
@@ -158,6 +154,7 @@ STAGE PLANS:
             properties:
               EXTERNAL TRUE
               bucket_count -1
+              column.name.delimiter ,
               columns sourceip,desturl,visitdate,adrevenue,useragent,ccode,lcode,skeyword,avgtimeonsite
               columns.comments 
               columns.types string:string:string:float:string:string:string:string:int
@@ -176,6 +173,7 @@ STAGE PLANS:
               properties:
                 EXTERNAL TRUE
                 bucket_count -1
+                column.name.delimiter ,
                 columns sourceip,desturl,visitdate,adrevenue,useragent,ccode,lcode,skeyword,avgtimeonsite
                 columns.comments 
                 columns.types string:string:string:float:string:string:string:string:int
@@ -294,6 +292,7 @@ POSTHOOK: Input: default@empty_tab
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 a                   	int                 	                    	                    	                    	                    	                    	                    	                    	                    	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\"}	 	 	 	 	 	 	 	 	 
 PREHOOK: query: explain
 analyze table empty_tab compute statistics for columns a,b,c,d,e
 PREHOOK: type: QUERY
@@ -362,6 +361,7 @@ POSTHOOK: Input: default@empty_tab
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 a                   	int                 	0                   	0                   	0                   	0                   	                    	                    	                    	                    	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\"}	 	 	 	 	 	 	 	 	 
 PREHOOK: query: desc formatted empty_tab b
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: default@empty_tab
@@ -371,6 +371,7 @@ POSTHOOK: Input: default@empty_tab
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 b                   	double              	0.0                 	0.0                 	0                   	0                   	                    	                    	                    	                    	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\"}	 	 	 	 	 	 	 	 	 
 PREHOOK: query: CREATE DATABASE test
 PREHOOK: type: CREATEDATABASE
 PREHOOK: Output: database:test

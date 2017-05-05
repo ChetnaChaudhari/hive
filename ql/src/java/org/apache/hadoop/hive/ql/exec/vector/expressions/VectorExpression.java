@@ -19,10 +19,12 @@
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.vector.VectorExpressionDescriptor;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 
@@ -32,7 +34,7 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 public abstract class VectorExpression implements Serializable {
   public enum Type {
     STRING, CHAR, VARCHAR, TIMESTAMP, DATE, LONG, DOUBLE, DECIMAL,
-    INTERVAL_YEAR_MONTH, INTERVAL_DAY_TIME, OTHER;
+    INTERVAL_YEAR_MONTH, INTERVAL_DAY_TIME, BINARY, OTHER;
     private static Map<String, Type> types = ImmutableMap.<String, Type>builder()
         .put("string", STRING)
         .put("char", CHAR)
@@ -44,6 +46,7 @@ public abstract class VectorExpression implements Serializable {
         .put("decimal", DECIMAL)
         .put("interval_year_month", INTERVAL_YEAR_MONTH)
         .put("interval_day_time", INTERVAL_DAY_TIME)
+        .put("binary", BINARY)
         .build();
 
     public static Type getValue(String name) {
@@ -76,6 +79,14 @@ public abstract class VectorExpression implements Serializable {
    * @param batch
    */
   public abstract void evaluate(VectorizedRowBatch batch);
+
+  public void init(Configuration conf) {
+    if (childExpressions != null) {
+      for (VectorExpression child : childExpressions) {
+        child.init(conf);
+      }
+    }
+  }
 
   /**
    * Returns the index of the output column in the array
@@ -176,5 +187,27 @@ public abstract class VectorExpression implements Serializable {
     }
 
     return b.toString();
+  }
+
+  public static String displayUtf8Bytes(byte[] bytes) {
+    if (bytes == null) {
+      return "NULL";
+    } else {
+      return new String(bytes, StandardCharsets.UTF_8);
+    }
+  }
+
+  public static String displayArrayOfUtf8ByteArrays(byte[][] arrayOfByteArrays) {
+    StringBuilder sb = new StringBuilder();
+    boolean isFirst = true;
+    for (byte[] bytes : arrayOfByteArrays) {
+      if (isFirst) {
+        isFirst = false;
+      } else {
+        sb.append(", ");
+      }
+      sb.append(displayUtf8Bytes(bytes));
+    }
+    return sb.toString();
   }
 }

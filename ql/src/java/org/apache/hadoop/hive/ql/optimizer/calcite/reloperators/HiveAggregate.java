@@ -23,8 +23,6 @@ import java.util.Set;
 
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
@@ -35,7 +33,6 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.calcite.util.IntList;
 import org.apache.hadoop.hive.ql.optimizer.calcite.TraitsUtil;
 
 import com.google.common.collect.Sets;
@@ -64,11 +61,6 @@ public class HiveAggregate extends Aggregate implements HiveRelNode {
   public void implement(Implementor implementor) {
   }
 
-  @Override
-  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
-    return mq.getNonCumulativeCost(this);
-  }
-
   // getRows will call estimateRowCount
   @Override
   public double estimateRowCount(RelMetadataQuery mq) {
@@ -90,7 +82,7 @@ public class HiveAggregate extends Aggregate implements HiveRelNode {
       final RelDataType inputRowType, boolean indicator,
       ImmutableBitSet groupSet, List<ImmutableBitSet> groupSets,
       final List<AggregateCall> aggCalls) {
-    final IntList groupList = groupSet.toList();
+    final List<Integer> groupList = groupSet.asList();
     assert groupList.size() == groupSet.cardinality();
     final RelDataTypeFactory.FieldInfoBuilder builder = typeFactory.builder();
     final List<RelDataTypeField> fieldList = inputRowType.getFieldList();

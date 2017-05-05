@@ -1,13 +1,9 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-CREATE TABLE orcsrc STORED AS ORC AS SELECT * FROM src
+PREHOOK: query: CREATE TABLE orcsrc STORED AS ORC AS SELECT * FROM src
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
 PREHOOK: Output: database:default
 PREHOOK: Output: default@orcsrc
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-CREATE TABLE orcsrc STORED AS ORC AS SELECT * FROM src
+POSTHOOK: query: CREATE TABLE orcsrc STORED AS ORC AS SELECT * FROM src
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
 POSTHOOK: Output: database:default
@@ -44,7 +40,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 5 (BROADCAST_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
         Reducer 5 <- Map 4 (SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
@@ -75,10 +71,9 @@ STAGE PLANS:
                         key expressions: _col0 (type: string)
                         sort order: +
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -87,7 +82,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 4 
@@ -117,10 +112,9 @@ STAGE PLANS:
                         key expressions: _col1 (type: string)
                         sort order: +
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -130,20 +124,26 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Aggregation Function UDF sum parameter expression for GROUPBY operator: UDF GenericUDFHash(Column[_col2], Column[_col3]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey0 (type: string)
                 outputColumnNames: _col0
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [0]
                 Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                 Map Join Operator
                   condition map:
@@ -151,17 +151,31 @@ STAGE PLANS:
                   keys:
                     0 _col0 (type: string)
                     1 _col0 (type: string)
+                  Map Join Vectorization:
+                      className: VectorMapJoinInnerStringOperator
+                      native: true
+                      nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                   outputColumnNames: _col2, _col3
                   input vertices:
                     1 Reducer 5
                   Statistics: Num rows: 550 Data size: 96800 Basic stats: COMPLETE Column stats: NONE
                   Group By Operator
                     aggregations: sum(hash(_col2,_col3))
+                    Group By Vectorization:
+                        aggregators: VectorUDAFSumLong(VectorUDFAdaptor(hash(_col2,_col3)) -> 2:int) -> bigint
+                        className: VectorGroupByOperator
+                        vectorOutput: true
+                        native: false
+                        projectedOutputColumns: [0]
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       sort order: 
+                      Reduce Sink Vectorization:
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: bigint)
         Reducer 3 
@@ -220,7 +234,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
 
@@ -279,7 +293,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 5 (BROADCAST_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
         Reducer 5 <- Map 4 (SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
@@ -303,10 +317,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -315,7 +328,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 4 
@@ -338,10 +351,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -351,20 +363,26 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Aggregation Function UDF sum parameter expression for GROUPBY operator: UDF GenericUDFHash(Column[_col2], Column[_col3]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey0 (type: string)
                 outputColumnNames: _col0
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [0]
                 Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                 Map Join Operator
                   condition map:
@@ -372,17 +390,31 @@ STAGE PLANS:
                   keys:
                     0 _col0 (type: string)
                     1 _col0 (type: string)
+                  Map Join Vectorization:
+                      className: VectorMapJoinOuterStringOperator
+                      native: true
+                      nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                   outputColumnNames: _col2, _col3
                   input vertices:
                     1 Reducer 5
                   Statistics: Num rows: 550 Data size: 96800 Basic stats: COMPLETE Column stats: NONE
                   Group By Operator
                     aggregations: sum(hash(_col2,_col3))
+                    Group By Vectorization:
+                        aggregators: VectorUDAFSumLong(VectorUDFAdaptor(hash(_col2,_col3)) -> 3:int) -> bigint
+                        className: VectorGroupByOperator
+                        vectorOutput: true
+                        native: false
+                        projectedOutputColumns: [0]
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       sort order: 
+                      Reduce Sink Vectorization:
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: bigint)
         Reducer 3 
@@ -441,7 +473,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
 
@@ -501,7 +533,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE)
         Reducer 4 <- Map 3 (SIMPLE_EDGE), Reducer 2 (BROADCAST_EDGE)
-        Reducer 5 <- Reducer 4 (SIMPLE_EDGE)
+        Reducer 5 <- Reducer 4 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -524,10 +556,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -536,7 +567,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 3 
@@ -559,10 +590,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -572,7 +602,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -600,19 +630,25 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
         Reducer 4 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Aggregation Function UDF sum parameter expression for GROUPBY operator: UDF GenericUDFHash(Column[_col2], Column[_col3]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: VALUE._col0 (type: string), KEY.reducesinkkey0 (type: string)
                 outputColumnNames: _col0, _col1
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [1, 0]
                 Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                 Map Join Operator
                   condition map:
@@ -620,17 +656,31 @@ STAGE PLANS:
                   keys:
                     0 _col0 (type: string)
                     1 _col0 (type: string)
+                  Map Join Vectorization:
+                      className: VectorMapJoinOuterStringOperator
+                      native: true
+                      nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                   outputColumnNames: _col2, _col3
                   input vertices:
                     0 Reducer 2
                   Statistics: Num rows: 550 Data size: 96800 Basic stats: COMPLETE Column stats: NONE
                   Group By Operator
                     aggregations: sum(hash(_col2,_col3))
+                    Group By Vectorization:
+                        aggregators: VectorUDAFSumLong(VectorUDFAdaptor(hash(_col2,_col3)) -> 2:int) -> bigint
+                        className: VectorGroupByOperator
+                        vectorOutput: true
+                        native: false
+                        projectedOutputColumns: [0]
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       sort order: 
+                      Reduce Sink Vectorization:
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: bigint)
         Reducer 5 
@@ -726,7 +776,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 5 (BROADCAST_EDGE), Reducer 7 (BROADCAST_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
         Reducer 5 <- Map 4 (SIMPLE_EDGE)
         Reducer 7 <- Map 6 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -758,10 +808,9 @@ STAGE PLANS:
                         key expressions: _col0 (type: string)
                         sort order: +
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -770,7 +819,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 4 
@@ -800,10 +849,9 @@ STAGE PLANS:
                         key expressions: _col1 (type: string)
                         sort order: +
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -813,7 +861,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 6 
@@ -843,10 +891,9 @@ STAGE PLANS:
                         key expressions: _col1 (type: string)
                         sort order: +
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -856,20 +903,26 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Aggregation Function UDF sum parameter expression for GROUPBY operator: UDF GenericUDFHash(Column[_col2], Column[_col3]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: KEY.reducesinkkey0 (type: string)
                 outputColumnNames: _col0
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [0]
                 Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                 Map Join Operator
                   condition map:
@@ -879,6 +932,11 @@ STAGE PLANS:
                     0 _col0 (type: string)
                     1 _col0 (type: string)
                     2 _col0 (type: string)
+                  Map Join Vectorization:
+                      className: VectorMapJoinOperator
+                      native: false
+                      nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                      nativeConditionsNotMet: One MapJoin Condition IS false
                   outputColumnNames: _col2, _col3
                   input vertices:
                     1 Reducer 5
@@ -886,11 +944,21 @@ STAGE PLANS:
                   Statistics: Num rows: 1100 Data size: 193600 Basic stats: COMPLETE Column stats: NONE
                   Group By Operator
                     aggregations: sum(hash(_col2,_col3))
+                    Group By Vectorization:
+                        aggregators: VectorUDAFSumLong(VectorUDFAdaptor(hash(_col2,_col3)) -> 2:int) -> bigint
+                        className: VectorGroupByOperator
+                        vectorOutput: true
+                        native: false
+                        projectedOutputColumns: [0]
                     mode: hash
                     outputColumnNames: _col0
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     Reduce Output Operator
                       sort order: 
+                      Reduce Sink Vectorization:
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: bigint)
         Reducer 3 
@@ -949,7 +1017,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
         Reducer 7 
@@ -977,7 +1045,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
 
   Stage: Stage-0
@@ -1048,7 +1116,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE)
         Reducer 3 <- Reducer 2 (SIMPLE_EDGE), Reducer 6 (SIMPLE_EDGE), Reducer 8 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
         Reducer 6 <- Map 5 (SIMPLE_EDGE)
         Reducer 8 <- Map 7 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -1073,10 +1141,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -1085,7 +1152,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 5 
@@ -1108,10 +1175,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1121,7 +1187,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 7 
@@ -1144,10 +1210,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1157,7 +1222,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -1185,7 +1250,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
         Reducer 3 
             Execution mode: llap
@@ -1202,6 +1267,10 @@ STAGE PLANS:
                 Statistics: Num rows: 1100 Data size: 193600 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(hash(_col2,_col3))
+                  Group By Vectorization:
+                      vectorOutput: false
+                      native: false
+                      projectedOutputColumns: null
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -1265,7 +1334,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
         Reducer 8 
@@ -1293,7 +1362,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
 
   Stage: Stage-0
@@ -1364,7 +1433,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE)
         Reducer 3 <- Reducer 2 (SIMPLE_EDGE), Reducer 6 (SIMPLE_EDGE), Reducer 8 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
         Reducer 6 <- Map 5 (SIMPLE_EDGE)
         Reducer 8 <- Map 7 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -1389,10 +1458,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -1401,7 +1469,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 5 
@@ -1424,10 +1492,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1437,7 +1504,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 7 
@@ -1460,10 +1527,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1473,7 +1539,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -1501,7 +1567,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
         Reducer 3 
             Execution mode: llap
@@ -1518,6 +1584,10 @@ STAGE PLANS:
                 Statistics: Num rows: 1100 Data size: 193600 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(hash(_col2,_col3))
+                  Group By Vectorization:
+                      vectorOutput: false
+                      native: false
+                      projectedOutputColumns: null
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -1581,7 +1651,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
         Reducer 8 
@@ -1609,7 +1679,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
 
   Stage: Stage-0
@@ -1680,7 +1750,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE)
         Reducer 3 <- Reducer 2 (SIMPLE_EDGE), Reducer 6 (SIMPLE_EDGE), Reducer 8 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
         Reducer 6 <- Map 5 (SIMPLE_EDGE)
         Reducer 8 <- Map 7 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -1705,10 +1775,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -1717,7 +1786,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 5 
@@ -1740,10 +1809,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1753,7 +1821,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 7 
@@ -1776,10 +1844,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -1789,7 +1856,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -1817,7 +1884,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
         Reducer 3 
             Execution mode: llap
@@ -1834,6 +1901,10 @@ STAGE PLANS:
                 Statistics: Num rows: 1100 Data size: 193600 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(hash(_col2,_col3))
+                  Group By Vectorization:
+                      vectorOutput: false
+                      native: false
+                      projectedOutputColumns: null
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -1897,7 +1968,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
         Reducer 8 
@@ -1925,7 +1996,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
 
   Stage: Stage-0
@@ -1996,7 +2067,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE)
         Reducer 3 <- Reducer 2 (SIMPLE_EDGE), Reducer 6 (SIMPLE_EDGE), Reducer 8 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
         Reducer 6 <- Map 5 (SIMPLE_EDGE)
         Reducer 8 <- Map 7 (SIMPLE_EDGE)
 #### A masked pattern was here ####
@@ -2021,10 +2092,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -2033,7 +2103,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 5 
@@ -2056,10 +2126,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -2069,7 +2138,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 7 
@@ -2092,10 +2161,9 @@ STAGE PLANS:
                       key expressions: _col1 (type: string)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: string)
             Execution mode: vectorized, llap
@@ -2105,7 +2173,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -2133,7 +2201,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
         Reducer 3 
             Execution mode: llap
@@ -2150,6 +2218,10 @@ STAGE PLANS:
                 Statistics: Num rows: 1100 Data size: 193600 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(hash(_col2,_col3))
+                  Group By Vectorization:
+                      vectorOutput: false
+                      native: false
+                      projectedOutputColumns: null
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
@@ -2213,7 +2285,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
                   value expressions: _col1 (type: string)
         Reducer 8 
@@ -2241,7 +2313,7 @@ STAGE PLANS:
                   Reduce Sink Vectorization:
                       className: VectorReduceSinkStringOperator
                       native: true
-                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                      nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                   Statistics: Num rows: 500 Data size: 88000 Basic stats: COMPLETE Column stats: NONE
 
   Stage: Stage-0

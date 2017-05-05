@@ -67,7 +67,7 @@ import org.apache.hadoop.hive.ql.udf.UDFFromUnixTime;
 import org.apache.hadoop.hive.ql.udf.UDFHex;
 import org.apache.hadoop.hive.ql.udf.UDFHour;
 import org.apache.hadoop.hive.ql.udf.UDFJson;
-import org.apache.hadoop.hive.ql.udf.UDFLength;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFLength;
 import org.apache.hadoop.hive.ql.udf.UDFLike;
 import org.apache.hadoop.hive.ql.udf.UDFLn;
 import org.apache.hadoop.hive.ql.udf.UDFLog;
@@ -213,6 +213,7 @@ public final class FunctionRegistry {
     system.registerGenericUDF("ceiling", GenericUDFCeil.class);
     system.registerUDF("rand", UDFRand.class, false);
     system.registerGenericUDF("abs", GenericUDFAbs.class);
+    system.registerGenericUDF("sq_count_check", GenericUDFSQCountCheck.class);
     system.registerGenericUDF("pmod", GenericUDFPosMod.class);
 
     system.registerUDF("ln", UDFLn.class, false);
@@ -261,13 +262,18 @@ public final class FunctionRegistry {
     system.registerGenericUDF("trim", GenericUDFTrim.class);
     system.registerGenericUDF("ltrim", GenericUDFLTrim.class);
     system.registerGenericUDF("rtrim", GenericUDFRTrim.class);
-    system.registerUDF("length", UDFLength.class, false);
+    system.registerGenericUDF("length", GenericUDFLength.class);
+    system.registerGenericUDF("character_length", GenericUDFCharacterLength.class);
+    system.registerGenericUDF("char_length", GenericUDFCharacterLength.class);
+    system.registerGenericUDF("octet_length", GenericUDFOctetLength.class);
     system.registerUDF("reverse", UDFReverse.class, false);
     system.registerGenericUDF("field", GenericUDFField.class);
     system.registerUDF("find_in_set", UDFFindInSet.class, false);
     system.registerGenericUDF("initcap", GenericUDFInitCap.class);
 
     system.registerUDF("like", UDFLike.class, true);
+    system.registerGenericUDF("likeany", GenericUDFLikeAny.class);
+    system.registerGenericUDF("likeall", GenericUDFLikeAll.class);
     system.registerGenericUDF("rlike", GenericUDFRegExp.class);
     system.registerGenericUDF("regexp", GenericUDFRegExp.class);
     system.registerUDF("regexp_replace", UDFRegExpReplace.class, false);
@@ -332,6 +338,7 @@ public final class FunctionRegistry {
     system.registerGenericUDF("*", GenericUDFOPMultiply.class);
     system.registerGenericUDF("/", GenericUDFOPDivide.class);
     system.registerGenericUDF("%", GenericUDFOPMod.class);
+    system.registerGenericUDF("mod", GenericUDFOPMod.class);
     system.registerUDF("div", UDFOPLongDivide.class, true);
 
     system.registerUDF("&", UDFOPBitAnd.class, true);
@@ -341,6 +348,8 @@ public final class FunctionRegistry {
     system.registerUDF("shiftleft", UDFOPBitShiftLeft.class, true);
     system.registerUDF("shiftright", UDFOPBitShiftRight.class, true);
     system.registerUDF("shiftrightunsigned", UDFOPBitShiftRightUnsigned.class, true);
+
+    system.registerGenericUDF("grouping", GenericUDFGrouping.class);
 
     system.registerGenericUDF("current_database", UDFCurrentDB.class);
     system.registerGenericUDF("current_date", GenericUDFCurrentDate.class);
@@ -367,6 +376,7 @@ public final class FunctionRegistry {
     system.registerGenericUDF("not", GenericUDFOPNot.class);
     system.registerGenericUDF("!", GenericUDFOPNot.class);
     system.registerGenericUDF("between", GenericUDFBetween.class);
+    system.registerGenericUDF("in_bloom_filter", GenericUDFInBloomFilter.class);
 
     system.registerGenericUDF("ewah_bitmap_and", GenericUDFEWAHBitmapAnd.class);
     system.registerGenericUDF("ewah_bitmap_or", GenericUDFEWAHBitmapOr.class);
@@ -413,6 +423,16 @@ public final class FunctionRegistry {
     system.registerGenericUDAF("covar_pop", new GenericUDAFCovariance());
     system.registerGenericUDAF("covar_samp", new GenericUDAFCovarianceSample());
     system.registerGenericUDAF("corr", new GenericUDAFCorrelation());
+    system.registerGenericUDAF("regr_slope", new GenericUDAFBinarySetFunctions.RegrSlope());
+    system.registerGenericUDAF("regr_intercept", new GenericUDAFBinarySetFunctions.RegrIntercept());
+    system.registerGenericUDAF("regr_r2", new GenericUDAFBinarySetFunctions.RegrR2());
+    system.registerGenericUDAF("regr_sxx", new GenericUDAFBinarySetFunctions.RegrSXX());
+    system.registerGenericUDAF("regr_syy", new GenericUDAFBinarySetFunctions.RegrSYY());
+    system.registerGenericUDAF("regr_sxy", new GenericUDAFBinarySetFunctions.RegrSXY());
+    system.registerGenericUDAF("regr_avgx", new GenericUDAFBinarySetFunctions.RegrAvgX());
+    system.registerGenericUDAF("regr_avgy", new GenericUDAFBinarySetFunctions.RegrAvgY());
+    system.registerGenericUDAF("regr_count", new GenericUDAFBinarySetFunctions.RegrCount());
+
     system.registerGenericUDAF("histogram_numeric", new GenericUDAFHistogramNumeric());
     system.registerGenericUDAF("percentile_approx", new GenericUDAFPercentileApprox());
     system.registerGenericUDAF("collect_set", new GenericUDAFCollectSet());
@@ -424,7 +444,7 @@ public final class FunctionRegistry {
     system.registerGenericUDAF("ewah_bitmap", new GenericUDAFEWAHBitmap());
 
     system.registerGenericUDAF("compute_stats", new GenericUDAFComputeStats());
-
+    system.registerGenericUDAF("bloom_filter", new GenericUDAFBloomFilter());
     system.registerUDAF("percentile", UDAFPercentile.class);
 
 
@@ -439,6 +459,7 @@ public final class FunctionRegistry {
     system.registerGenericUDF("struct", GenericUDFStruct.class);
     system.registerGenericUDF("named_struct", GenericUDFNamedStruct.class);
     system.registerGenericUDF("create_union", GenericUDFUnion.class);
+    system.registerGenericUDF("extract_union", GenericUDFExtractUnion.class);
 
     system.registerGenericUDF("case", GenericUDFCase.class);
     system.registerGenericUDF("when", GenericUDFWhen.class);
@@ -461,6 +482,8 @@ public final class FunctionRegistry {
     system.registerGenericUDF("printf", GenericUDFPrintf.class);
     system.registerGenericUDF("greatest", GenericUDFGreatest.class);
     system.registerGenericUDF("least", GenericUDFLeast.class);
+    system.registerGenericUDF("cardinality_violation", GenericUDFCardinalityViolation.class);
+    system.registerGenericUDF("width_bucket", GenericUDFWidthBucket.class);
 
     system.registerGenericUDF("from_utc_timestamp", GenericUDFFromUtcTimestamp.class);
     system.registerGenericUDF("to_utc_timestamp", GenericUDFToUtcTimestamp.class);
@@ -468,6 +491,7 @@ public final class FunctionRegistry {
     system.registerGenericUDF("unix_timestamp", GenericUDFUnixTimeStamp.class);
     system.registerGenericUDF("to_unix_timestamp", GenericUDFToUnixTimeStamp.class);
 
+    system.registerGenericUDF("internal_interval", GenericUDFInternalInterval.class);
     // Generic UDTF's
     system.registerGenericUDTF("explode", GenericUDTFExplode.class);
     system.registerGenericUDTF("replicate_rows", GenericUDTFReplicateRows.class);
@@ -722,6 +746,15 @@ public final class FunctionRegistry {
 
     PrimitiveGrouping pgA = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcA);
     PrimitiveGrouping pgB = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcB);
+
+    // untyped nulls
+    if (pgA == PrimitiveGrouping.VOID_GROUP) {
+      return b;
+    }
+    if (pgB == PrimitiveGrouping.VOID_GROUP) {
+      return a;
+    }
+
     if (pgA != pgB) {
       return null;
     }
@@ -748,7 +781,7 @@ public final class FunctionRegistry {
    *
    * @return null if no common class could be found.
    */
-  public static TypeInfo getCommonClassForComparison(TypeInfo a, TypeInfo b) {
+  public static synchronized TypeInfo getCommonClassForComparison(TypeInfo a, TypeInfo b) {
     // If same return one of them
     if (a.equals(b)) {
       return a;
@@ -767,12 +800,21 @@ public final class FunctionRegistry {
 
     PrimitiveGrouping pgA = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcA);
     PrimitiveGrouping pgB = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcB);
+
+    if (pgA == pgB) {
+      // grouping is same, but category is not.
+      if (pgA == PrimitiveGrouping.DATE_GROUP) {
+        // we got timestamp & date and timestamp has higher precedence than date
+        return TypeInfoFactory.timestampTypeInfo;
+      }
+    }
     // handle string types properly
     if (pgA == PrimitiveGrouping.STRING_GROUP && pgB == PrimitiveGrouping.STRING_GROUP) {
       // Compare as strings. Char comparison semantics may be different if/when implemented.
       return getTypeInfoForPrimitiveCategory(
           (PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b,PrimitiveCategory.STRING);
     }
+
     // timestamp/date is higher precedence than String_GROUP
     if (pgA == PrimitiveGrouping.STRING_GROUP && pgB == PrimitiveGrouping.DATE_GROUP) {
       return b;
@@ -1447,6 +1489,20 @@ public final class FunctionRegistry {
    */
   public static boolean isOpNot(ExprNodeDesc desc) {
     return GenericUDFOPNot.class == getGenericUDFClassFromExprDesc(desc);
+  }
+
+  /**
+   * Returns whether the fn is an exact equality comparison.
+   */
+  public static boolean isEq(GenericUDF fn) {
+    return fn instanceof GenericUDFOPEqual;
+  }
+
+  /**
+   * Returns whether the fn is an exact non-equality comparison.
+   */
+  public static boolean isNeq(GenericUDF fn) {
+    return fn instanceof GenericUDFOPNotEqual;
   }
 
   /**

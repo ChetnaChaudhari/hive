@@ -617,6 +617,11 @@ public final class ObjectInspectorUtils {
    * @param hashCode as produced by {@link #getBucketHashCode(Object[], ObjectInspector[])}
    */
   public static int getBucketNumber(int hashCode, int numberOfBuckets) {
+    if(numberOfBuckets <= 0) {
+      //note that (X % 0) is illegal and (X % -1) = 0
+      // -1 is a common default when the value is missing
+      throw new IllegalArgumentException("Number of Buckets must be > 0");
+    }
     return (hashCode & Integer.MAX_VALUE) % numberOfBuckets;
   }
   /**
@@ -698,6 +703,8 @@ public final class ObjectInspectorUtils {
             .getPrimitiveWritableObject(o);
         return intervalDayTime.hashCode();
       case DECIMAL:
+        // Since getBucketHashCode uses this, HiveDecimal return the old (much slower) but
+        // compatible hash code.
         return ((HiveDecimalObjectInspector) poi).getPrimitiveWritableObject(o).hashCode();
 
       default: {

@@ -1,6 +1,4 @@
-PREHOOK: query: -- Test math functions in vectorized mode to verify they run correctly end-to-end.
-
-explain vectorization expression
+PREHOOK: query: explain vectorization expression
 select
    cdouble
   ,Round(cdouble, 2)
@@ -12,9 +10,9 @@ select
   ,Ln(cdouble)  
   ,Ln(cfloat)
   ,Log10(cdouble)
-  -- Use log2 as a representative function to test all input types.
+
   ,Log2(cdouble)
-  -- Use 15601.0 to test zero handling, as there are no zeroes in the table
+
   ,Log2(cdouble - 15601.0)
   ,Log2(cfloat)
   ,Log2(cbigint)
@@ -44,17 +42,15 @@ select
   ,Negative(cdouble)
   ,Sign(cdouble)
   ,Sign(cbigint)
-  -- Test nesting
+
   ,cos(-sin(log(cdouble)) + 3.14159)
 from alltypesorc
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cfloat) >= -1.0
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Test math functions in vectorized mode to verify they run correctly end-to-end.
-
-explain vectorization expression
+POSTHOOK: query: explain vectorization expression
 select
    cdouble
   ,Round(cdouble, 2)
@@ -66,9 +62,9 @@ select
   ,Ln(cdouble)  
   ,Ln(cfloat)
   ,Log10(cdouble)
-  -- Use log2 as a representative function to test all input types.
+
   ,Log2(cdouble)
-  -- Use 15601.0 to test zero handling, as there are no zeroes in the table
+
   ,Log2(cdouble - 15601.0)
   ,Log2(cfloat)
   ,Log2(cbigint)
@@ -98,12 +94,12 @@ select
   ,Negative(cdouble)
   ,Sign(cdouble)
   ,Sign(cbigint)
-  -- Test nesting
+
   ,cos(-sin(log(cdouble)) + 3.14159)
 from alltypesorc
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cfloat) >= -1.0
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -138,7 +134,7 @@ STAGE PLANS:
                     className: VectorSelectOperator
                     native: true
                     projectedOutputColumns: [5, 13, 12, 14, 15, 16, 18, 17, 19, 20, 21, 23, 22, 24, 25, 26, 27, 28, 30, 31, 29, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 5, 3, 46, 47, 48, 49]
-                    selectExpressions: RoundWithNumDigitsDoubleToDouble(col 5, decimalPlaces 2) -> 13:double, FuncFloorDoubleToLong(col 5) -> 12:long, FuncCeilDoubleToLong(col 5) -> 14:long, FuncRandNoSeed -> 15:double, FuncRand -> 16:double, FuncExpDoubleToDouble(col 17)(children: FuncLnDoubleToDouble(col 5) -> 17:double) -> 18:double, FuncLnDoubleToDouble(col 5) -> 17:double, FuncLnDoubleToDouble(col 4) -> 19:double, FuncLog10DoubleToDouble(col 5) -> 20:double, FuncLog2DoubleToDouble(col 5) -> 21:double, FuncLog2DoubleToDouble(col 22)(children: DoubleColSubtractDoubleScalar(col 5, val 15601.0) -> 22:double) -> 23:double, FuncLog2DoubleToDouble(col 4) -> 22:double, FuncLog2LongToDouble(col 3) -> 24:double, FuncLog2LongToDouble(col 2) -> 25:double, FuncLog2LongToDouble(col 1) -> 26:double, FuncLog2LongToDouble(col 0) -> 27:double, VectorUDFAdaptor(log(2, cdouble)) -> 28:Double, VectorUDFAdaptor(power(log2(cdouble), 2))(children: FuncLog2DoubleToDouble(col 5) -> 29:double) -> 30:Double, VectorUDFAdaptor(power(log2(cdouble), 2))(children: FuncLog2DoubleToDouble(col 5) -> 29:double) -> 31:Double, FuncSqrtDoubleToDouble(col 5) -> 29:double, FuncSqrtLongToDouble(col 3) -> 32:double, FuncBin(col 3) -> 33:String, VectorUDFAdaptor(hex(cdouble)) -> 34:String, VectorUDFAdaptor(conv(cbigint, 10, 16)) -> 35:String, FuncAbsDoubleToDouble(col 5) -> 36:double, FuncAbsLongToLong(col 0) -> 37:long, PosModLongToLong(col 2, divisor 3) -> 38:long, FuncSinDoubleToDouble(col 5) -> 39:double, FuncASinDoubleToDouble(col 5) -> 40:double, FuncCosDoubleToDouble(col 5) -> 41:double, FuncACosDoubleToDouble(col 5) -> 42:double, FuncATanDoubleToDouble(col 5) -> 43:double, FuncDegreesDoubleToDouble(col 5) -> 44:double, FuncRadiansDoubleToDouble(col 5) -> 45:double, DoubleColUnaryMinus(col 5) -> 46:double, FuncSignDoubleToDouble(col 5) -> 47:double, FuncSignLongToDouble(col 3) -> 48:double, FuncCosDoubleToDouble(col 50)(children: DoubleColAddDoubleScalar(col 49, val 3.14159)(children: DoubleColUnaryMinus(col 50)(children: FuncSinDoubleToDouble(col 49)(children: FuncLnDoubleToDouble(col 5) -> 49:double) -> 50:double) -> 49:double) -> 50:double) -> 49:double
+                    selectExpressions: RoundWithNumDigitsDoubleToDouble(col 5, decimalPlaces 2) -> 13:double, FuncFloorDoubleToLong(col 5) -> 12:long, FuncCeilDoubleToLong(col 5) -> 14:long, FuncRandNoSeed -> 15:double, FuncRand -> 16:double, FuncExpDoubleToDouble(col 17)(children: FuncLnDoubleToDouble(col 5) -> 17:double) -> 18:double, FuncLnDoubleToDouble(col 5) -> 17:double, FuncLnDoubleToDouble(col 4) -> 19:double, FuncLog10DoubleToDouble(col 5) -> 20:double, FuncLog2DoubleToDouble(col 5) -> 21:double, FuncLog2DoubleToDouble(col 22)(children: DoubleColSubtractDoubleScalar(col 5, val 15601.0) -> 22:double) -> 23:double, FuncLog2DoubleToDouble(col 4) -> 22:double, FuncLog2LongToDouble(col 3) -> 24:double, FuncLog2LongToDouble(col 2) -> 25:double, FuncLog2LongToDouble(col 1) -> 26:double, FuncLog2LongToDouble(col 0) -> 27:double, VectorUDFAdaptor(log(2, cdouble)) -> 28:double, VectorUDFAdaptor(power(log2(cdouble), 2))(children: FuncLog2DoubleToDouble(col 5) -> 29:double) -> 30:double, VectorUDFAdaptor(power(log2(cdouble), 2))(children: FuncLog2DoubleToDouble(col 5) -> 29:double) -> 31:double, FuncSqrtDoubleToDouble(col 5) -> 29:double, FuncSqrtLongToDouble(col 3) -> 32:double, FuncBin(col 3) -> 33:String, VectorUDFAdaptor(hex(cdouble)) -> 34:string, VectorUDFAdaptor(conv(cbigint, 10, 16)) -> 35:string, FuncAbsDoubleToDouble(col 5) -> 36:double, FuncAbsLongToLong(col 0) -> 37:long, PosModLongToLong(col 2, divisor 3) -> 38:long, FuncSinDoubleToDouble(col 5) -> 39:double, FuncASinDoubleToDouble(col 5) -> 40:double, FuncCosDoubleToDouble(col 5) -> 41:double, FuncACosDoubleToDouble(col 5) -> 42:double, FuncATanDoubleToDouble(col 5) -> 43:double, FuncDegreesDoubleToDouble(col 5) -> 44:double, FuncRadiansDoubleToDouble(col 5) -> 45:double, DoubleColUnaryMinus(col 5) -> 46:double, FuncSignDoubleToDouble(col 5) -> 47:double, FuncSignLongToDouble(col 3) -> 48:double, FuncCosDoubleToDouble(col 50)(children: DoubleColAddDoubleScalar(col 49, val 3.14159)(children: DoubleColUnaryMinus(col 50)(children: FuncSinDoubleToDouble(col 49)(children: FuncLnDoubleToDouble(col 5) -> 49:double) -> 50:double) -> 49:double) -> 50:double) -> 49:double
                 Statistics: Num rows: 2048 Data size: 440327 Basic stats: COMPLETE Column stats: NONE
                 File Output Operator
                   compressed: false
@@ -171,16 +167,16 @@ PREHOOK: query: select
   ,Round(cdouble, 2)
   ,Floor(cdouble)
   ,Ceil(cdouble)
-  -- Omit rand() from runtime test because it's nondeterministic.
-  -- ,Rand()
+
+
   ,Rand(98007)
   ,Exp(ln(cdouble))
   ,Ln(cdouble)  
   ,Ln(cfloat)
   ,Log10(cdouble)
-  -- Use log2 as a representative function to test all input types.
+
   ,Log2(cdouble)
-  -- Use 15601.0 to test zero handling, as there are no zeroes in the table
+
   ,Log2(cdouble - 15601.0)
   ,Log2(cfloat)
   ,Log2(cbigint)
@@ -210,12 +206,12 @@ PREHOOK: query: select
   ,Negative(cdouble)
   ,Sign(cdouble)
   ,Sign(cbigint)
-  -- Test nesting
+
   ,cos(-sin(log(cdouble)) + 3.14159)
 from alltypesorc
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cfloat) >= -1.0
 PREHOOK: type: QUERY
 PREHOOK: Input: default@alltypesorc
@@ -225,16 +221,16 @@ POSTHOOK: query: select
   ,Round(cdouble, 2)
   ,Floor(cdouble)
   ,Ceil(cdouble)
-  -- Omit rand() from runtime test because it's nondeterministic.
-  -- ,Rand()
+
+
   ,Rand(98007)
   ,Exp(ln(cdouble))
   ,Ln(cdouble)  
   ,Ln(cfloat)
   ,Log10(cdouble)
-  -- Use log2 as a representative function to test all input types.
+
   ,Log2(cdouble)
-  -- Use 15601.0 to test zero handling, as there are no zeroes in the table
+
   ,Log2(cdouble - 15601.0)
   ,Log2(cfloat)
   ,Log2(cbigint)
@@ -264,12 +260,12 @@ POSTHOOK: query: select
   ,Negative(cdouble)
   ,Sign(cdouble)
   ,Sign(cbigint)
-  -- Test nesting
+
   ,cos(-sin(log(cdouble)) + 3.14159)
 from alltypesorc
--- limit output to a reasonably small number of rows
+
 where cbigint % 500 = 0
--- test use of a math function in the WHERE clause
+
 and sin(cfloat) >= -1.0
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc

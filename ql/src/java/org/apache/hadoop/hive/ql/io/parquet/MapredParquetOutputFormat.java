@@ -18,7 +18,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.TimeZone;
 
+import org.apache.hadoop.hive.ql.io.parquet.serde.ParquetTableUtils;
+import org.apache.hadoop.hive.ql.io.parquet.timestamp.NanoTimeUtils;
+import org.apache.parquet.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileSystem;
@@ -28,6 +32,8 @@ import org.apache.hadoop.hive.ql.io.IOConstants;
 import org.apache.hadoop.hive.ql.io.parquet.convert.HiveSchemaConverter;
 import org.apache.hadoop.hive.ql.io.parquet.write.DataWritableWriteSupport;
 import org.apache.hadoop.hive.ql.io.parquet.write.ParquetRecordWriterWrapper;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.io.ParquetHiveRecord;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
@@ -39,7 +45,6 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordWriter;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.util.Progressable;
-
 import org.apache.parquet.hadoop.ParquetOutputFormat;
 
 /**
@@ -97,11 +102,12 @@ public class MapredParquetOutputFormat extends FileOutputFormat<NullWritable, Pa
     final String columnTypeProperty = tableProperties.getProperty(IOConstants.COLUMNS_TYPES);
     List<String> columnNames;
     List<TypeInfo> columnTypes;
-
+    final String columnNameDelimiter = tableProperties.containsKey(serdeConstants.COLUMN_NAME_DELIMITER) ? tableProperties
+        .getProperty(serdeConstants.COLUMN_NAME_DELIMITER) : String.valueOf(SerDeUtils.COMMA);
     if (columnNameProperty.length() == 0) {
       columnNames = new ArrayList<String>();
     } else {
-      columnNames = Arrays.asList(columnNameProperty.split(","));
+      columnNames = Arrays.asList(columnNameProperty.split(columnNameDelimiter));
     }
 
     if (columnTypeProperty.length() == 0) {
@@ -111,6 +117,7 @@ public class MapredParquetOutputFormat extends FileOutputFormat<NullWritable, Pa
     }
 
     DataWritableWriteSupport.setSchema(HiveSchemaConverter.convert(columnNames, columnTypes), jobConf);
+    DataWritableWriteSupport.setTimeZone(getParquetWriterTimeZone(tableProperties), jobConf);
 
     return getParquerRecordWriterWrapper(realOutputFormat, jobConf, finalOutPath.toString(),
             progress,tableProperties);
@@ -125,5 +132,19 @@ public class MapredParquetOutputFormat extends FileOutputFormat<NullWritable, Pa
       ) throws IOException {
     return new ParquetRecordWriterWrapper(realOutputFormat, jobConf, finalOutPath.toString(),
             progress,tableProperties);
+  }
+
+  private TimeZone getParquetWriterTimeZone(Properties tableProperties) {
+    // PARQUET_INT96_WRITE_ZONE_PROPERTY is a table property used to detect what timezone
+    // conversion to use when writing Parquet timestamps.
+    String timeZoneID =
+        tableProperties.getProperty(ParquetTableUtils.PARQUET_INT96_WRITE_ZONE_PROPERTY);
+    if (!Strings.isNullOrEmpty(timeZoneID)) {
+
+      NanoTimeUtils.validateTimeZone(timeZoneID);
+      return TimeZone.getTimeZone(timeZoneID);
+    }
+
+    return TimeZone.getDefault();
   }
 }

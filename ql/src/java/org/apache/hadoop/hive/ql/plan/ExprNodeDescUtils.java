@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluatorFactory;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.optimizer.ConstantPropagateProcFactory;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
@@ -504,7 +505,11 @@ public class ExprNodeDescUtils {
 		} else if (exprDesc instanceof ExprNodeFieldDesc) {
 			getExprNodeColumnDesc(((ExprNodeFieldDesc) exprDesc).getDesc(),
 					hashCodeToColumnDescMap);
-		}
+		} else if( exprDesc instanceof  ExprNodeSubQueryDesc) {
+		    getExprNodeColumnDesc(((ExprNodeSubQueryDesc) exprDesc).getSubQueryLhs(),
+                    hashCodeToColumnDescMap);
+        }
+
 	}
 
   public static boolean isConstant(ExprNodeDesc value) {
@@ -712,5 +717,144 @@ public class ExprNodeDescUtils {
     }
     // Otherwise, we return the expression
     return foldedExpr;
+  }
+
+  /**
+   * Checks whether the keys of a parent operator are a prefix of the keys of a
+   * child operator.
+   * @param childKeys keys of the child operator
+   * @param parentKeys keys of the parent operator
+   * @param childOp child operator
+   * @param parentOp parent operator
+   * @return true if the keys are a prefix, false otherwise
+   * @throws SemanticException
+   */
+  public static boolean checkPrefixKeys(List<ExprNodeDesc> childKeys, List<ExprNodeDesc> parentKeys,
+      Operator<? extends OperatorDesc> childOp, Operator<? extends OperatorDesc> parentOp)
+          throws SemanticException {
+    return checkPrefixKeys(childKeys, parentKeys, childOp, parentOp, false);
+  }
+
+  /**
+   * Checks whether the keys of a child operator are a prefix of the keys of a
+   * parent operator.
+   * @param childKeys keys of the child operator
+   * @param parentKeys keys of the parent operator
+   * @param childOp child operator
+   * @param parentOp parent operator
+   * @return true if the keys are a prefix, false otherwise
+   * @throws SemanticException
+   */
+  public static boolean checkPrefixKeysUpstream(List<ExprNodeDesc> childKeys, List<ExprNodeDesc> parentKeys,
+      Operator<? extends OperatorDesc> childOp, Operator<? extends OperatorDesc> parentOp)
+          throws SemanticException {
+    return checkPrefixKeys(childKeys, parentKeys, childOp, parentOp, true);
+  }
+
+  private static boolean checkPrefixKeys(List<ExprNodeDesc> childKeys, List<ExprNodeDesc> parentKeys,
+      Operator<? extends OperatorDesc> childOp, Operator<? extends OperatorDesc> parentOp,
+      boolean upstream) throws SemanticException {
+    if (childKeys == null || childKeys.isEmpty()) {
+      if (parentKeys != null && !parentKeys.isEmpty()) {
+        return false;
+      }
+      return true;
+    }
+    if (parentKeys == null || parentKeys.isEmpty()) {
+      return false;
+    }
+    int size;
+    if (upstream) {
+      if (childKeys.size() > parentKeys.size()) {
+        return false;
+      }
+      size = childKeys.size();
+    } else {
+      if (parentKeys.size() > childKeys.size()) {
+        return false;
+      }
+      size = parentKeys.size();
+    }
+    for (int i = 0; i < size; i++) {
+      ExprNodeDesc expr = ExprNodeDescUtils.backtrack(childKeys.get(i), childOp, parentOp);
+      if (expr == null) {
+        // cKey is not present in parent
+        return false;
+      }
+      if (!expr.isSame(parentKeys.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static class ColumnOrigin {
+    public ExprNodeColumnDesc col;
+    public Operator<?> op;
+
+    public ColumnOrigin(ExprNodeColumnDesc col, Operator<?> op) {
+      super();
+      this.col = col;
+      this.op = op;
+    }
+  }
+
+  private static ExprNodeDesc findParentExpr(ExprNodeColumnDesc col, Operator<?> op) {
+    if (op instanceof ReduceSinkOperator) {
+      return col;
+    }
+
+    ExprNodeDesc parentExpr = col;
+    Map<String, ExprNodeDesc> mapping = op.getColumnExprMap();
+    if (mapping != null) {
+      parentExpr = mapping.get(col.getColumn());
+    }
+    return parentExpr;
+  }
+
+  public static ColumnOrigin findColumnOrigin(ExprNodeDesc expr, Operator<?> op) {
+    if (expr == null || op == null) {
+      // bad input
+      return null;
+    }
+
+    ExprNodeColumnDesc col = ExprNodeDescUtils.getColumnExpr(expr);
+    if (col == null) {
+      // not a column
+      return null;
+    }
+
+    Operator<?> parentOp = null;
+    int numParents = op.getNumParent();
+    if (numParents == 0) {
+      return new ColumnOrigin(col, op);
+    }
+
+    ExprNodeDesc parentExpr = findParentExpr(col, op);
+    if (parentExpr == null) {
+      // couldn't find proper parent column expr
+      return null;
+    }
+
+    if (numParents == 1) {
+      parentOp = op.getParentOperators().get(0);
+    } else {
+      // Multiple parents - find the right one based on the table alias in the parentExpr
+      ExprNodeColumnDesc parentCol = ExprNodeDescUtils.getColumnExpr(parentExpr);
+      if (parentCol != null) {
+        for (Operator<?> currParent : op.getParentOperators()) {
+          if (currParent.getSchema().getTableNames().contains(parentCol.getTabAlias())) {
+            parentOp = currParent;
+            break;
+          }
+        }
+      }
+    }
+
+    if (parentOp == null) {
+      return null;
+    }
+
+    return findColumnOrigin(parentExpr, parentOp);
   }
 }

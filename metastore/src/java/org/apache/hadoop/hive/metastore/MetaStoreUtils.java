@@ -47,6 +47,7 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -86,6 +87,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
+import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hive.common.util.HiveStringUtils;
 import org.apache.hive.common.util.ReflectionUtil;
 
@@ -292,13 +294,21 @@ public class MetaStoreUtils {
       return true;
     }
 
-    if (environmentContext != null
-        && environmentContext.isSetProperties()
-        && StatsSetupConst.TASK.equals(environmentContext.getProperties().get(
-            StatsSetupConst.STATS_GENERATED))) {
-      return true;
+    if (environmentContext != null && environmentContext.isSetProperties()) {
+      String statsType = environmentContext.getProperties().get(StatsSetupConst.STATS_GENERATED);
+      // no matter STATS_GENERATED is USER or TASK, all need to re-calculate the stats:
+      // USER: alter table .. update statistics
+      // TASK: from some sql operation which could collect and compute stats
+      if (StatsSetupConst.TASK.equals(statsType) || StatsSetupConst.USER.equals(statsType)) {
+        return true;
+      }
     }
 
+    // requires to calculate stats if new and old have different fast stats
+    return !isFastStatsSame(oldPart, newPart);
+  }
+
+  static boolean isFastStatsSame(Partition oldPart, Partition newPart) {
     // requires to calculate stats if new and old have different fast stats
     if ((oldPart != null) && (oldPart.getParameters() != null)) {
       for (String stat : StatsSetupConst.fastStats) {
@@ -306,10 +316,13 @@ public class MetaStoreUtils {
           Long oldStat = Long.parseLong(oldPart.getParameters().get(stat));
           Long newStat = Long.parseLong(newPart.getParameters().get(stat));
           if (!oldStat.equals(newStat)) {
-            return true;
+            return false;
           }
+        } else {
+          return false;
         }
       }
+      return true;
     }
     return false;
   }
@@ -367,19 +380,26 @@ public class MetaStoreUtils {
         FileStatus[] fileStatus = wh.getFileStatusesForLocation(part.getLocation());
         populateQuickStats(fileStatus, params);
         LOG.warn("Updated size to " + params.get(StatsSetupConst.TOTAL_SIZE));
-        if (environmentContext != null
-            && environmentContext.isSetProperties()
-            && StatsSetupConst.TASK.equals(environmentContext.getProperties().get(
-                StatsSetupConst.STATS_GENERATED))) {
-          StatsSetupConst.setBasicStatsState(params, StatsSetupConst.TRUE);
-        } else {
-          StatsSetupConst.setBasicStatsState(params, StatsSetupConst.FALSE);
-        }
+        updateBasicState(environmentContext, params);
       }
       part.setParameters(params);
       updated = true;
     }
     return updated;
+  }
+
+  static void updateBasicState(EnvironmentContext environmentContext, Map<String,String> params) {
+    if (params == null) {
+      return;
+    }
+    if (environmentContext != null
+        && environmentContext.isSetProperties()
+        && StatsSetupConst.TASK.equals(environmentContext.getProperties().get(
+        StatsSetupConst.STATS_GENERATED))) {
+      StatsSetupConst.setBasicStatsState(params, StatsSetupConst.TRUE);
+    } else {
+      StatsSetupConst.setBasicStatsState(params, StatsSetupConst.FALSE);
+    }
   }
 
   /**
@@ -617,14 +637,6 @@ public class MetaStoreUtils {
     }
   }
 
-  static boolean isCascadeNeededInAlterTable(Table oldTable, Table newTable) {
-    //currently cascade only supports add/replace columns and
-    //changing column type/position/name/comments
-    List<FieldSchema> oldCols = oldTable.getSd().getCols();
-    List<FieldSchema> newCols = newTable.getSd().getCols();
-    return !areSameColumns(oldCols, newCols);
-  }
-
   static boolean areSameColumns(List<FieldSchema> oldCols, List<FieldSchema> newCols) {
     if (oldCols.size() != newCols.size()) {
       return false;
@@ -637,6 +649,21 @@ public class MetaStoreUtils {
         }
       }
     }
+    return true;
+  }
+
+  static boolean columnsIncluded(List<FieldSchema> oldCols, List<FieldSchema> newCols) {
+    if (oldCols.size() > newCols.size()) {
+      return false;
+    }
+
+    Set<FieldSchema> newColsSet = new HashSet<FieldSchema>(newCols);
+    for (final FieldSchema oldCol : oldCols) {
+      if (!newColsSet.contains(oldCol)) {
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -660,8 +687,6 @@ public class MetaStoreUtils {
       TypeInfoUtils.getTypeInfoFromTypeString(newType));
   }
 
-  public static final int MAX_MS_TYPENAME_LENGTH = 2000; // 4000/2, for an unlikely unicode case
-
   public static final String TYPE_FROM_DESERIALIZER = "<derived from deserializer>";
   /**
    * validate column type
@@ -672,9 +697,6 @@ public class MetaStoreUtils {
    */
   static public String validateColumnType(String type) {
     if (type.equals(TYPE_FROM_DESERIALIZER)) return null;
-    if (type.length() > MAX_MS_TYPENAME_LENGTH) {
-      return "type name is too long: " + type;
-    }
     int last = 0;
     boolean lastAlphaDigit = isValidTypeChar(type.charAt(last));
     for (int i = 1; i <= type.length(); i++) {
@@ -1020,9 +1042,10 @@ public class MetaStoreUtils {
     StringBuilder colComment = new StringBuilder();
 
     boolean first = true;
+    String columnNameDelimiter = getColumnNameDelimiter(cols);
     for (FieldSchema col : cols) {
       if (!first) {
-        colNameBuf.append(",");
+        colNameBuf.append(columnNameDelimiter);
         colTypeBuf.append(":");
         colComment.append('\0');
       }
@@ -1034,6 +1057,7 @@ public class MetaStoreUtils {
     schema.setProperty(
         org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_COLUMNS,
         colNameBuf.toString());
+    schema.setProperty(serdeConstants.COLUMN_NAME_DELIMITER, columnNameDelimiter);
     String colTypes = colTypeBuf.toString();
     schema.setProperty(
         org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_COLUMN_TYPES,
@@ -1147,15 +1171,25 @@ public class MetaStoreUtils {
     return addCols(getSchemaWithoutCols(sd, tblsd, parameters, databaseName, tableName, partitionKeys), tblsd.getCols());
   }
 
+  public static String getColumnNameDelimiter(List<FieldSchema> fieldSchemas) {
+    // we first take a look if any fieldSchemas contain COMMA
+    for (int i = 0; i < fieldSchemas.size(); i++) {
+      if (fieldSchemas.get(i).getName().contains(",")) {
+        return String.valueOf(SerDeUtils.COLUMN_COMMENTS_DELIMITER);
+      }
+    }
+    return String.valueOf(SerDeUtils.COMMA);
+  }
+  
   /**
    * Convert FieldSchemas to columnNames.
    */
-  public static String getColumnNamesFromFieldSchema(
-      List<FieldSchema> fieldSchemas) {
+  public static String getColumnNamesFromFieldSchema(List<FieldSchema> fieldSchemas) {
+    String delimiter = getColumnNameDelimiter(fieldSchemas);
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < fieldSchemas.size(); i++) {
       if (i > 0) {
-        sb.append(",");
+        sb.append(delimiter);
       }
       sb.append(fieldSchemas.get(i).getName());
     }
@@ -1478,7 +1512,7 @@ public class MetaStoreUtils {
   }
 
   public static boolean isNonNativeTable(Table table) {
-    if (table == null) {
+    if (table == null || table.getParameters() == null) {
       return false;
     }
     return (table.getParameters().get(hive_metastoreConstants.META_TABLE_STORAGE) != null);
@@ -1647,7 +1681,7 @@ public class MetaStoreUtils {
     }
     for (int i = 0; i < parameterTypes.length; i++) {
       Class<?> clazz = parameterTypes[i];
-      if (!(clazz.isInstance(initargs[i]))) {
+      if (initargs[i] != null && !(clazz.isInstance(initargs[i]))) {
         throw new IllegalArgumentException("Object : " + initargs[i]
             + " is not an instance of " + clazz);
       }
@@ -1721,8 +1755,19 @@ public class MetaStoreUtils {
    * @param conf
    * @return The SASL configuration
    */
-  public static Map<String, String> getMetaStoreSaslProperties(HiveConf conf) {
+  public static Map<String, String> getMetaStoreSaslProperties(HiveConf conf, boolean useSSL) {
     // As of now Hive Meta Store uses the same configuration as Hadoop SASL configuration
+
+    // If SSL is enabled, override the given value of "hadoop.rpc.protection" and set it to "authentication"
+    // This disables any encryption provided by SASL, since SSL already provides it
+    String hadoopRpcProtectionVal = conf.get(CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION);
+    String hadoopRpcProtectionAuth = SaslRpcServer.QualityOfProtection.AUTHENTICATION.toString();
+
+    if (useSSL && hadoopRpcProtectionVal != null && !hadoopRpcProtectionVal.equals(hadoopRpcProtectionAuth)) {
+      LOG.warn("Overriding value of " + CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION + " setting it from "
+              + hadoopRpcProtectionVal + " to " + hadoopRpcProtectionAuth + " because SSL is enabled");
+      conf.set(CommonConfigurationKeysPublic.HADOOP_RPC_PROTECTION, hadoopRpcProtectionAuth);
+    }
     return ShimLoader.getHadoopThriftAuthBridge().getHadoopSaslProperties(conf);
   }
 

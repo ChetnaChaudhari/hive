@@ -95,17 +95,7 @@ private static final Logger LOG = LoggerFactory.getLogger(CLASS_NAME);
   }
 
   protected void initLoggingPrefix(String className) {
-    if (hconf == null) {
-      // Constructor time...
-      loggingPrefix = className;
-    } else {
-      // Determine the name of our map or reduce task for debug tracing.
-      BaseWork work = Utilities.getMapWork(hconf);
-      if (work == null) {
-        work = Utilities.getReduceWork(hconf);
-      }
-      loggingPrefix = className + " " + work.getName() + " " + getOperatorId();
-    }
+    loggingPrefix = className;
   }
 
   //------------------------------------------------------------------------------------------------

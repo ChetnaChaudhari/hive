@@ -18,20 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
-import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_TEMPORARY_TABLE_STORAGE;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.Serializable;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConfUtil;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.ErrorMsg;
@@ -62,6 +50,7 @@ import org.apache.hadoop.hive.ql.plan.SkewedColumnPositionPair;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.ql.stats.StatsCollectionContext;
 import org.apache.hadoop.hive.ql.stats.StatsPublisher;
+import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.Serializer;
@@ -72,7 +61,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.SubStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
-import org.apache.hadoop.hive.serde2.thrift.ThriftJDBCBinarySerDe;
 import org.apache.hadoop.hive.shims.HadoopShims.StoragePolicyShim;
 import org.apache.hadoop.hive.shims.HadoopShims.StoragePolicyValue;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -84,7 +72,19 @@ import org.apache.hive.common.util.HiveStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.Serializable;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_TEMPORARY_TABLE_STORAGE;
 
 /**
  * File Sink operator implementation.
@@ -230,8 +230,18 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
             }
           }
           if (needToRename && outPaths[idx] != null && !fs.rename(outPaths[idx], finalPaths[idx])) {
-            throw new HiveException("Unable to rename output from: " +
+            FileStatus fileStatus = FileUtils.getFileStatusOrNull(fs, finalPaths[idx]);
+            if (fileStatus != null) {
+              LOG.warn("Target path " + finalPaths[idx] + " with a size " + fileStatus.getLen() + " exists. Trying to delete it.");
+              if (!fs.delete(finalPaths[idx], true)) {
+                throw new HiveException("Unable to delete existing target output: " + finalPaths[idx]);
+              }
+            }
+
+            if (!fs.rename(outPaths[idx], finalPaths[idx])) {
+              throw new HiveException("Unable to rename output from: " +
                 outPaths[idx] + " to: " + finalPaths[idx]);
+            }
           }
           updateProgress();
         } catch (IOException e) {
@@ -357,7 +367,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       parent = Utilities.toTempPath(conf.getDirName());
       statsFromRecordWriter = new boolean[numFiles];
       serializer = (Serializer) conf.getTableInfo().getDeserializerClass().newInstance();
-      serializer.initialize(hconf, conf.getTableInfo().getProperties());
+      serializer.initialize(unsetNestedColumnPaths(hconf), conf.getTableInfo().getProperties());
       outputClass = serializer.getSerializedClass();
 
       if (isLogInfoEnabled) {
@@ -454,13 +464,10 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
   }
 
   private void logOutputFormatError(Configuration hconf, HiveException ex) {
-    StringWriter errorWriter = new StringWriter();
+    StringBuilder errorWriter = new StringBuilder();
     errorWriter.append("Failed to create output format; configuration: ");
-    try {
-      Configuration.dumpConfiguration(hconf, errorWriter);
-    } catch (IOException ex2) {
-      errorWriter.append("{ failed to dump configuration: " + ex2.getMessage() + " }");
-    }
+    // redact sensitive information before logging
+    HiveConfUtil.dumpConfig(hconf, errorWriter);
     Properties tdp = null;
     if (this.conf.getTableInfo() != null
         && (tdp = this.conf.getTableInfo().getProperties()) != null) {
@@ -491,7 +498,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
     this.maxPartitions = dpCtx.getMaxPartitionsPerNode();
 
     assert numDynParts == dpColNames.size()
-        : "number of dynamic paritions should be the same as the size of DP mapping";
+        : "number of dynamic partitions should be the same as the size of DP mapping";
 
     if (dpColNames != null && dpColNames.size() > 0) {
       this.bDynParts = true;
@@ -1023,9 +1030,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       // If serializer is ThriftJDBCBinarySerDe, then it buffers rows to a certain limit (hive.server2.thrift.resultset.max.fetch.size)
       // and serializes the whole batch when the buffer is full. The serialize returns null if the buffer is not full
       // (the size of buffer is kept track of in the ThriftJDBCBinarySerDe).
-      if (conf.isHiveServerQuery() && HiveConf.getBoolVar(hconf,
-          HiveConf.ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_SERIALIZE_IN_TASKS) &&
-          serializer.getClass().getName().equalsIgnoreCase(ThriftJDBCBinarySerDe.class.getName())) {
+      if (conf.isUsingThriftJDBCBinarySerDe()) {
           try {
             recordValue = serializer.serialize(null, inputObjInspectors[0]);
             if ( null != fpaths ) {
@@ -1291,5 +1296,18 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
       }
     }
     return new String[] {fspKey, null};
+  }
+
+  /**
+   * Check if nested column paths is set for 'conf'.
+   * If set, create a copy of 'conf' with this property unset.
+   */
+  private Configuration unsetNestedColumnPaths(Configuration conf) {
+    if (conf.get(ColumnProjectionUtils.READ_NESTED_COLUMN_PATH_CONF_STR) != null) {
+      Configuration confCopy = new Configuration(conf);
+      confCopy.unset(ColumnProjectionUtils.READ_NESTED_COLUMN_PATH_CONF_STR);
+      return confCopy;
+    }
+    return conf;
   }
 }

@@ -17,7 +17,6 @@
  */
 
 package org.apache.hadoop.hive.ql.plan;
-import java.util.List;
 
 import org.apache.hadoop.hive.ql.plan.Explain.Level;
 import org.apache.hadoop.hive.ql.plan.Explain.Vectorization;

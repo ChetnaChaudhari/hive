@@ -402,8 +402,8 @@ public class BucketingSortingReduceSinkOptimizer extends Transform {
       }
 
       // Don't do this optimization with updates or deletes
-      if (pGraphContext.getContext().getAcidOperation() == AcidUtils.Operation.UPDATE ||
-          pGraphContext.getContext().getAcidOperation() == AcidUtils.Operation.DELETE){
+      if (fsOp.getConf().getWriteType() == AcidUtils.Operation.UPDATE ||
+        fsOp.getConf().getWriteType() == AcidUtils.Operation.DELETE) {
         return null;
       }
 

@@ -41,7 +41,7 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
   private int outputColumn;
   private long longValue;
   private Timestamp timestampValue;
-  private byte[] stringValue;
+  private byte[] bytesValue;
   private transient SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
   private transient final Text text = new Text();
   private int baseDate;
@@ -57,7 +57,9 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
     } else if (object instanceof Timestamp) {
       this.timestampValue = (Timestamp) object;
     } else if (object instanceof byte []) {
-      this.stringValue = (byte []) object;
+      this.bytesValue = (byte []) object;
+    } else {
+      throw new RuntimeException("Unexpected scalar object " + object.getClass().getName() + " " + object.toString());
     }
   }
 
@@ -101,7 +103,7 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
       case CHAR:
       case VARCHAR:
         try {
-          date.setTime(formatter.parse(new String(stringValue, "UTF-8")).getTime());
+          date.setTime(formatter.parse(new String(bytesValue, "UTF-8")).getTime());
           baseDate = DateWritable.dateToDays(date);
           break;
         } catch (Exception e) {
@@ -290,16 +292,16 @@ public class VectorUDFDateDiffColScalar extends VectorExpression {
   }
 
   public byte[] getStringValue() {
-    return stringValue;
+    return bytesValue;
   }
 
-  public void setStringValue(byte[] stringValue) {
-    this.stringValue = stringValue;
+  public void setStringValue(byte[] bytesValue) {
+    this.bytesValue = bytesValue;
   }
 
   @Override
   public String vectorExpressionParameters() {
-    return "col " + colNum + ", val " + new String(stringValue, StandardCharsets.UTF_8);
+    return "col " + colNum + ", val " + displayUtf8Bytes(bytesValue);
   }
 
   @Override

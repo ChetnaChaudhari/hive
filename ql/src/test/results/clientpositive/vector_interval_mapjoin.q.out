@@ -202,7 +202,7 @@ STAGE PLANS:
             alias: vectortab_b_1korc
             Statistics: Num rows: 1000 Data size: 458448 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate: (s is not null and (dt - CAST( ts AS DATE)) is not null) (type: boolean)
+              predicate: (s is not null and dt is not null and ts is not null) (type: boolean)
               Statistics: Num rows: 1000 Data size: 458448 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: s (type: string), (dt - CAST( ts AS DATE)) (type: interval_day_time)
@@ -226,8 +226,8 @@ STAGE PLANS:
               Filter Vectorization:
                   className: VectorFilterOperator
                   native: true
-                  predicateExpression: FilterExprAndExpr(children: SelectColumnIsNotNull(col 8) -> boolean, SelectColumnIsNotNull(col 14)(children: DateColSubtractDateColumn(col 12, col 13)(children: CastTimestampToDate(col 10) -> 13:date) -> 14:timestamp) -> boolean) -> boolean
-              predicate: (s is not null and (dt - CAST( ts AS DATE)) is not null) (type: boolean)
+                  predicateExpression: FilterExprAndExpr(children: SelectColumnIsNotNull(col 8) -> boolean, SelectColumnIsNotNull(col 12) -> boolean, SelectColumnIsNotNull(col 10) -> boolean) -> boolean
+              predicate: (s is not null and dt is not null and ts is not null) (type: boolean)
               Statistics: Num rows: 1000 Data size: 460264 Basic stats: COMPLETE Column stats: NONE
               Select Operator
                 expressions: s (type: string), (dt - CAST( ts AS DATE)) (type: interval_day_time)
@@ -247,7 +247,7 @@ STAGE PLANS:
                   Map Join Vectorization:
                       className: VectorMapJoinOperator
                       native: false
-                      nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                      nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                       nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false
                   outputColumnNames: _col0, _col1, _col2
                   Statistics: Num rows: 1100 Data size: 506290 Basic stats: COMPLETE Column stats: NONE

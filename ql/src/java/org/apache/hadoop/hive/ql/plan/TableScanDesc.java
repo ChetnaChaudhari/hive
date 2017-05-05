@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.ql.plan.Explain.Level;
 import org.apache.hadoop.hive.ql.plan.Explain.Vectorization;
 import org.apache.hadoop.hive.serde.serdeConstants;
 
-
 /**
  * Table Scan Descriptor Currently, data is only read from a base source as part
  * of map-reduce framework. So, nothing is stored in the descriptor. But, more
@@ -82,6 +81,7 @@ public class TableScanDesc extends AbstractOperatorDesc {
   // SELECT count(*) FROM t).
   private List<Integer> neededColumnIDs;
   private List<String> neededColumns;
+  private List<String> neededNestedColumnPaths;
 
   // all column names referenced including virtual columns. used in ColumnAccessAnalyzer
   private transient List<String> referencedColumns;
@@ -203,12 +203,31 @@ public class TableScanDesc extends AbstractOperatorDesc {
     return neededColumnIDs;
   }
 
+  public List<String> getNeededNestedColumnPaths() {
+    return neededNestedColumnPaths;
+  }
+
+  public void setNeededNestedColumnPaths(List<String> neededNestedColumnPaths) {
+    this.neededNestedColumnPaths = neededNestedColumnPaths;
+  }
+
   public void setNeededColumns(List<String> neededColumns) {
     this.neededColumns = neededColumns;
   }
 
   public List<String> getNeededColumns() {
     return neededColumns;
+  }
+
+  @Explain(displayName = "Pruned Column Paths")
+  public List<String> getPrunedColumnPaths() {
+    List<String> result = new ArrayList<>();
+    for (String p : neededNestedColumnPaths) {
+      if (p.indexOf('.') >= 0) {
+        result.add(p);
+      }
+    }
+    return result;
   }
 
   public void setReferencedColumns(List<String> referencedColumns) {

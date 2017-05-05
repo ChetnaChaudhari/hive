@@ -22,7 +22,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -32,8 +31,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.vector.VectorColumnOutputMapping;
-import org.apache.hadoop.hive.ql.exec.vector.VectorColumnSourceMapping;
 import org.apache.hadoop.hive.ql.plan.Explain.Level;
 import org.apache.hadoop.hive.ql.plan.Explain.Vectorization;
 import org.apache.hadoop.hive.ql.plan.VectorMapJoinDesc.HashTableImplementationType;
@@ -91,7 +88,7 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   public MapJoinDesc(MapJoinDesc clone) {
     super(clone);
     if (clone.vectorDesc != null) {
-      throw new RuntimeException("Clone with vectorization desc not supported");
+      vectorDesc = (VectorDesc) clone.vectorDesc.clone();
     }
     this.keys = clone.keys;
     this.keyTblDesc = clone.keyTblDesc;
@@ -112,11 +109,12 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   }
 
   public MapJoinDesc(final Map<Byte, List<ExprNodeDesc>> keys,
-      final TableDesc keyTblDesc, final Map<Byte, List<ExprNodeDesc>> values,
-      final List<TableDesc> valueTblDescs,final List<TableDesc> valueFilteredTblDescs,  List<String> outputColumnNames,
-      final int posBigTable, final JoinCondDesc[] conds,
-      final Map<Byte, List<ExprNodeDesc>> filters, boolean noOuterJoin, String dumpFilePrefix) {
-    super(values, outputColumnNames, noOuterJoin, conds, filters, null);
+    final TableDesc keyTblDesc, final Map<Byte, List<ExprNodeDesc>> values,
+    final List<TableDesc> valueTblDescs, final List<TableDesc> valueFilteredTblDescs, List<String> outputColumnNames,
+    final int posBigTable, final JoinCondDesc[] conds,
+    final Map<Byte, List<ExprNodeDesc>> filters, boolean noOuterJoin, String dumpFilePrefix,
+    final long noConditionalTaskSize) {
+    super(values, outputColumnNames, noOuterJoin, conds, filters, null, noConditionalTaskSize);
     vectorDesc = null;
     this.keys = keys;
     this.keyTblDesc = keyTblDesc;
@@ -391,7 +389,7 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   }
 
   // Use LinkedHashSet to give predictable display order.
-  private static Set<String> vectorizableMapJoinNativeEngines =
+  private static final Set<String> vectorizableMapJoinNativeEngines =
       new LinkedHashSet<String>(Arrays.asList("tez", "spark"));
 
   public class MapJoinOperatorExplainVectorization extends OperatorExplainVectorization {
@@ -420,37 +418,48 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
       boolean engineInSupported = vectorizableMapJoinNativeEngines.contains(engine);
 
       boolean isFastHashTableEnabled = vectorMapJoinDesc.getIsFastHashTableEnabled();
-      boolean isHybridHashJoin = vectorMapJoinDesc.getIsHybridHashJoin();
 
-      boolean whenFastHashTableThenNoHybrid =
-          (!isFastHashTableEnabled ? true : !isHybridHashJoin);
-
-      VectorizationCondition[] conditions = new VectorizationCondition[] {
+      List<VectorizationCondition> conditionList = new ArrayList<VectorizationCondition>();
+      conditionList.add(
+          new VectorizationCondition(
+              vectorMapJoinDesc.getUseOptimizedTable(),
+              HiveConf.ConfVars.HIVEMAPJOINUSEOPTIMIZEDTABLE.varname));
+      conditionList.add(
           new VectorizationCondition(
               enabled,
-              HiveConf.ConfVars.HIVE_VECTORIZATION_MAPJOIN_NATIVE_ENABLED.varname),
+              HiveConf.ConfVars.HIVE_VECTORIZATION_MAPJOIN_NATIVE_ENABLED.varname));
+      conditionList.add(
           new VectorizationCondition(
               engineInSupported,
-              engineInSupportedCondName),
+              engineInSupportedCondName));
+      conditionList.add(
           new VectorizationCondition(
               vectorMapJoinDesc.getOneMapJoinCondition(),
-              "One MapJoin Condition"),
+              "One MapJoin Condition"));
+      conditionList.add(
           new VectorizationCondition(
               !vectorMapJoinDesc.getHasNullSafes(),
-              "No nullsafe"),
-          new VectorizationCondition(
-              vectorMapJoinDesc.getSupportsKeyTypes(),
-              "Supports Key Types"),
-          new VectorizationCondition(
-              !vectorMapJoinDesc.getIsEmptyKey(),
-              "Not empty key"),
-          new VectorizationCondition(
-              whenFastHashTableThenNoHybrid,
-              "When Fast Hash Table, then requires no Hybrid Hash Join"),
+              "No nullsafe"));
+      conditionList.add(
           new VectorizationCondition(
               vectorMapJoinDesc.getSmallTableExprVectorizes(),
-              "Small table vectorizes"),
-      };
+              "Small table vectorizes"));
+
+      if (isFastHashTableEnabled) {
+        conditionList.add(
+            new VectorizationCondition(
+                !vectorMapJoinDesc.getIsHybridHashJoin(),
+                "Fast Hash Table and No Hybrid Hash Join"));
+      } else {
+        conditionList.add(
+            new VectorizationCondition(
+                vectorMapJoinDesc.getSupportsKeyTypes(),
+                "Optimized Table and Supports Key Types"));
+      }
+
+      VectorizationCondition[] conditions =
+          conditionList.toArray(new VectorizationCondition[0]);
+
       return conditions;
     }
 
@@ -577,5 +586,4 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     }
     return new SMBJoinOperatorExplainVectorization((SMBJoinDesc) this, vectorDesc);
   }
-
 }

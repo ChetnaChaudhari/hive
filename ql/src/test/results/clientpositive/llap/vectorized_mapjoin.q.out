@@ -1,12 +1,8 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION EXPRESSION  SELECT COUNT(t1.cint), MAX(t2.cint), MIN(t1.cint), AVG(t1.cint+t2.cint)
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT COUNT(t1.cint), MAX(t2.cint), MIN(t1.cint), AVG(t1.cint+t2.cint)
   FROM alltypesorc t1
   JOIN alltypesorc t2 ON t1.cint = t2.cint
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION EXPRESSION  SELECT COUNT(t1.cint), MAX(t2.cint), MIN(t1.cint), AVG(t1.cint+t2.cint)
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT COUNT(t1.cint), MAX(t2.cint), MIN(t1.cint), AVG(t1.cint+t2.cint)
   FROM alltypesorc t1
   JOIN alltypesorc t2 ON t1.cint = t2.cint
 POSTHOOK: type: QUERY
@@ -24,7 +20,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -59,7 +55,7 @@ STAGE PLANS:
                         Map Join Vectorization:
                             className: VectorMapJoinInnerBigOnlyLongOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                         outputColumnNames: _col0, _col1
                         input vertices:
                           1 Map 3
@@ -129,7 +125,7 @@ STAGE PLANS:
                         Reduce Sink Vectorization:
                             className: VectorReduceSinkLongOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 9173 Data size: 27396 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs

@@ -1,13 +1,4 @@
-PREHOOK: query: -- HIVE-13872
--- Looking for TableScan immediately followed by ReduceSink (no intervening SEL operator).
--- This caused problems for Vectorizer not eliminating columns which are not included.
--- The input file format didn't fill in those vectorized columns and thus caused NPE in
--- ReduceSink.
--- Only a problem when NOT CBO because of CBO rule-based transforms.
---
--- Using a cross-product.
-
-create table store_sales_txt
+PREHOOK: query: create table store_sales_txt
 (
     ss_sold_date_sk           int,
     ss_sold_time_sk           int,
@@ -38,16 +29,7 @@ stored as textfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@store_sales_txt
-POSTHOOK: query: -- HIVE-13872
--- Looking for TableScan immediately followed by ReduceSink (no intervening SEL operator).
--- This caused problems for Vectorizer not eliminating columns which are not included.
--- The input file format didn't fill in those vectorized columns and thus caused NPE in
--- ReduceSink.
--- Only a problem when NOT CBO because of CBO rule-based transforms.
---
--- Using a cross-product.
-
-create table store_sales_txt
+POSTHOOK: query: create table store_sales_txt
 (
     ss_sold_date_sk           int,
     ss_sold_time_sk           int,
@@ -205,7 +187,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 2 <- Map 1 (BROADCAST_EDGE)
-        Reducer 3 <- Map 2 (SIMPLE_EDGE)
+        Reducer 3 <- Map 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -221,8 +203,8 @@ STAGE PLANS:
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkOperator
                         native: false
-                        nativeConditionsMet: hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                        nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false, Uniform Hash IS false
+                        nativeConditionsMet: hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                        nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false
                     Statistics: Num rows: 200 Data size: 74200 Basic stats: COMPLETE Column stats: NONE
                     value expressions: cd_demo_sk (type: int), cd_marital_status (type: string)
             Execution mode: vectorized, llap
@@ -250,10 +232,9 @@ STAGE PLANS:
                       0 
                       1 
                     Map Join Vectorization:
-                        className: VectorMapJoinOperator
-                        native: false
-                        nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
-                        nativeConditionsNotMet: Not empty key IS false
+                        className: VectorMapJoinInnerMultiKeyOperator
+                        native: true
+                        nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                     outputColumnNames: _col0, _col2, _col16
                     input vertices:
                       0 Map 1
@@ -262,7 +243,7 @@ STAGE PLANS:
                       Filter Vectorization:
                           className: VectorFilterOperator
                           native: true
-                          predicateExpression: FilterExprOrExpr(children: FilterExprAndExpr(children: FilterLongColEqualLongColumn(col 0, col 2) -> boolean, FilterStringGroupColEqualStringScalar(col 1, val M) -> boolean) -> boolean, FilterExprAndExpr(children: FilterLongColEqualLongColumn(col 0, col 2) -> boolean, FilterStringGroupColEqualStringScalar(col 1, val U) -> boolean) -> boolean) -> boolean
+                          predicateExpression: FilterExprOrExpr(children: FilterExprAndExpr(children: FilterLongColEqualLongColumn(col 23, col 4) -> boolean, FilterStringGroupColEqualStringScalar(col 24, val M) -> boolean) -> boolean, FilterExprAndExpr(children: FilterLongColEqualLongColumn(col 23, col 4) -> boolean, FilterStringGroupColEqualStringScalar(col 24, val U) -> boolean) -> boolean) -> boolean
                       predicate: (((_col0 = _col16) and (_col2 = 'M')) or ((_col0 = _col16) and (_col2 = 'U'))) (type: boolean)
                       Statistics: Num rows: 100000 Data size: 46027600 Basic stats: COMPLETE Column stats: NONE
                       Select Operator
@@ -274,7 +255,7 @@ STAGE PLANS:
                         Group By Operator
                           aggregations: count(1)
                           Group By Vectorization:
-                              aggregators: VectorUDAFCount(ConstantVectorExpression(val 1) -> 3:long) -> bigint
+                              aggregators: VectorUDAFCount(ConstantVectorExpression(val 1) -> 25:long) -> bigint
                               className: VectorGroupByOperator
                               vectorOutput: true
                               native: false
@@ -287,8 +268,8 @@ STAGE PLANS:
                             Reduce Sink Vectorization:
                                 className: VectorReduceSinkOperator
                                 native: false
-                                nativeConditionsMet: hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                                nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false, Uniform Hash IS false
+                                nativeConditionsMet: hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                                nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false
                             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: bigint)
             Execution mode: vectorized, llap

@@ -129,7 +129,7 @@ public class CliConfigs {
 
         setHiveConfDir("data/conf/tez");
         setClusterType(MiniClusterType.tez);
-        setMetastoreType(MetastoreType.hbase);
+        setMetastoreType(MetastoreType.sql);
         setFsType(QTestUtil.FsType.hdfs);
       } catch (Exception e) {
         throw new RuntimeException("can't construct cliconfig", e);
@@ -287,6 +287,7 @@ public class CliConfigs {
 
         excludesFrom(testConfigProps, "minimr.query.negative.files");
         excludeQuery("authorization_uri_import.q");
+        excludeQuery("spark_job_max_tasks.q");
 
         setResultsDir("ql/src/test/results/clientnegative");
         setLogDir("itests/qtest/target/qfile-results/clientnegative");
@@ -406,19 +407,17 @@ public class CliConfigs {
 
   public static class BeeLineConfig extends AbstractCliConfig {
     public BeeLineConfig() {
-      // FIXME: beeline is disabled...
-      super(null);
-      // super(CoreBeeLineDriver.class);
+      super(CoreBeeLineDriver.class);
       try {
         setQueryDir("ql/src/test/queries/clientpositive");
 
-        excludesFrom(testConfigProps, "beeline.positive.exclude");
+        includesFrom(testConfigProps, "beeline.positive.include");
 
-        setResultsDir("ql/src/test/results/clientpositive");
+        setResultsDir("ql/src/test/results/clientpositive/beeline");
         setLogDir("itests/qtest/target/qfile-results/beelinepositive");
 
-        setInitScript("q_test_init.sql");
-        setCleanupScript("q_test_cleanup.sql");
+        setInitScript("q_test_init_src.sql");
+        setCleanupScript("q_test_cleanup_src.sql");
 
         setHiveConfDir("");
         setClusterType(MiniClusterType.none);
@@ -433,8 +432,6 @@ public class CliConfigs {
       super(CoreAccumuloCliDriver.class);
       try {
         setQueryDir("accumulo-handler/src/test/queries/positive");
-
-        excludesFrom(testConfigProps, "beeline.positive.exclude");
 
         setResultsDir("accumulo-handler/src/test/results/positive");
         setLogDir("itests/qtest/target/qfile-results/accumulo-handler/positive");
@@ -479,6 +476,7 @@ public class CliConfigs {
         setQueryDir("ql/src/test/queries/clientpositive");
 
         includesFrom(testConfigProps, "miniSparkOnYarn.query.files");
+        includesFrom(testConfigProps, "spark.only.query.files");
 
         setResultsDir("ql/src/test/results/clientpositive/spark");
         setLogDir("itests/qtest-spark/target/qfile-results/clientpositive/spark");

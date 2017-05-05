@@ -59,6 +59,8 @@ public class JoinDesc extends AbstractOperatorDesc {
   // alias to filter mapping
   private Map<Byte, List<ExprNodeDesc>> filters;
 
+  private List<ExprNodeDesc> residualFilterExprs;
+
   // pos of outer join alias=<pos of other alias:num of filters on outer join alias>xn
   // for example,
   // a left outer join b on a.k=b.k AND a.k>5 full outer join c on a.k=c.k AND a.k>10 AND c.k>20
@@ -105,20 +107,23 @@ public class JoinDesc extends AbstractOperatorDesc {
   private transient boolean leftInputJoin;
   private transient List<String> streamAliases;
 
+  // non-transient field, used at runtime to kill a task if it exceeded memory limits when running in LLAP
+  protected long noConditionalTaskSize;
+
   public JoinDesc() {
   }
 
   public JoinDesc(final Map<Byte, List<ExprNodeDesc>> exprs,
       List<String> outputColumnNames, final boolean noOuterJoin,
       final JoinCondDesc[] conds, final Map<Byte, List<ExprNodeDesc>> filters,
-      ExprNodeDesc[][] joinKeys) {
+      ExprNodeDesc[][] joinKeys, final long noConditionalTaskSize) {
     this.exprs = exprs;
     this.outputColumnNames = outputColumnNames;
     this.noOuterJoin = noOuterJoin;
     this.conds = conds;
     this.filters = filters;
     this.joinKeys = joinKeys;
-
+    this.noConditionalTaskSize = noConditionalTaskSize;
     resetOrder();
   }
 
@@ -145,6 +150,7 @@ public class JoinDesc extends AbstractOperatorDesc {
     ret.setHandleSkewJoin(handleSkewJoin);
     ret.setSkewKeyDefinition(getSkewKeyDefinition());
     ret.setTagOrder(getTagOrder().clone());
+    ret.setNoConditionalTaskSize(getNoConditionalTaskSize());
     if (getKeyTableDesc() != null) {
       ret.setKeyTableDesc((TableDesc) getKeyTableDesc().clone());
     }
@@ -193,7 +199,9 @@ public class JoinDesc extends AbstractOperatorDesc {
     this.tagOrder = clone.tagOrder;
     this.filters = clone.filters;
     this.filterMap = clone.filterMap;
+    this.residualFilterExprs = clone.residualFilterExprs;
     this.statistics = clone.statistics;
+    this.noConditionalTaskSize = clone.noConditionalTaskSize;
   }
 
   public Map<Byte, List<ExprNodeDesc>> getExprs() {
@@ -292,6 +300,36 @@ public class JoinDesc extends AbstractOperatorDesc {
 
   public void setFilters(Map<Byte, List<ExprNodeDesc>> filters) {
     this.filters = filters;
+  }
+
+  @Explain(displayName = "residual filter predicates", explainLevels = { Level.USER, Level.DEFAULT, Level.EXTENDED })
+  public String getResidualFilterExprsString() {
+    if (getResidualFilterExprs() == null || getResidualFilterExprs().size() == 0) {
+      return null;
+    }
+
+    StringBuilder sb = new StringBuilder();
+    boolean first = true;
+    for (ExprNodeDesc expr : getResidualFilterExprs()) {
+      if (!first) {
+        sb.append(" ");
+      }
+
+      first = false;
+      sb.append("{");
+      sb.append(expr.getExprString());
+      sb.append("}");
+    }
+
+    return sb.toString();
+  }
+
+  public List<ExprNodeDesc> getResidualFilterExprs() {
+    return residualFilterExprs;
+  }
+
+  public void setResidualFilterExprs(List<ExprNodeDesc> residualFilterExprs) {
+    this.residualFilterExprs = residualFilterExprs;
   }
 
   @Explain(displayName = "outputColumnNames")
@@ -649,4 +687,13 @@ public class JoinDesc extends AbstractOperatorDesc {
     streamAliases = joinDesc.streamAliases == null ? null : new ArrayList<String>(joinDesc.streamAliases);
   }
 
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JoinDesc.class);
+
+  public long getNoConditionalTaskSize() {
+    return noConditionalTaskSize;
+  }
+
+  public void setNoConditionalTaskSize(final long noConditionalTaskSize) {
+    this.noConditionalTaskSize = noConditionalTaskSize;
+  }
 }

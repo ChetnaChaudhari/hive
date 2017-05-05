@@ -23,7 +23,13 @@ import static org.junit.Assert.fail;
 import com.google.common.base.Strings;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Map;
+
 import org.apache.hadoop.hive.cli.control.AbstractCliConfig.MetastoreType;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveVariableSource;
+import org.apache.hadoop.hive.conf.VariableSubstitution;
+import org.apache.hadoop.hive.ql.QTestProcessExecResult;
 import org.apache.hadoop.hive.ql.QTestUtil;
 import org.apache.hadoop.hive.ql.QTestUtil.MiniClusterType;
 import org.junit.After;
@@ -134,12 +140,14 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
       if ((ecode == 0) ^ expectSuccess) {
         qt.failed(ecode, fname, debugHint);
       }
-      ecode = qt.checkCliDriverResults(fname);
-      if (ecode != 0) {
-        qt.failedDiff(ecode, fname, debugHint);
+      QTestProcessExecResult result = qt.checkCliDriverResults(fname);
+      if (result.getReturnCode() != 0) {
+        String message = Strings.isNullOrEmpty(result.getCapturedOutput()) ?
+            debugHint : "\r\n" + result.getCapturedOutput();
+        qt.failedDiff(result.getReturnCode(), fname, message);
       }
     }
-    catch (Throwable e) {
+    catch (Exception e) {
       qt.failed(e, fname, debugHint);
     }
 
@@ -157,11 +165,19 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
    *  the same ${test.blobstore.path} (possible if test runs are controlled by an automated system)
    */
   private void setupUniqueTestPath() {
-    String testBlobstorePath = qt.getConf().get(HCONF_TEST_BLOBSTORE_PATH);
+    String testBlobstorePath = new VariableSubstitution(new HiveVariableSource() {
+      @Override
+      public Map<String, String> getHiveVariable() {
+        return null;
+      }
+    }).substitute(new HiveConf(), qt.getConf().get(HCONF_TEST_BLOBSTORE_PATH));
+
     testBlobstorePath = QTestUtil.ensurePathEndsInSlash(testBlobstorePath);
     testBlobstorePath += QTestUtil.ensurePathEndsInSlash(this.getClass().getSimpleName()); // name of child class
     String uid = new SimpleDateFormat("yyyyMMdd.HHmmss.SSS").format(Calendar.getInstance().getTime())
         + "-" + String.format("%03d", (int)(Math.random() * 999));
     testBlobstorePathUnique = testBlobstorePath + uid;
+
+    qt.addPatternWithMaskComment(testBlobstorePathUnique, String.format("### %s ###", HCONF_TEST_BLOBSTORE_PATH));
   }
 }

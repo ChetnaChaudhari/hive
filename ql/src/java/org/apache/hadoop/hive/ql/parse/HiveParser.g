@@ -20,7 +20,7 @@ options
 {
 tokenVocab=HiveLexer;
 output=AST;
-ASTLabelType=CommonTree;
+ASTLabelType=ASTNode;
 backtrack=false;
 k=3;
 }
@@ -42,6 +42,7 @@ TOK_SUBQUERY;
 TOK_INSERT_INTO;
 TOK_DESTINATION;
 TOK_ALLCOLREF;
+TOK_SETCOLREF;
 TOK_TABLE_OR_COL;
 TOK_FUNCTION;
 TOK_FUNCTIONDI;
@@ -88,6 +89,10 @@ TOK_DISTRIBUTEBY;
 TOK_SORTBY;
 TOK_UNIONALL;
 TOK_UNIONDISTINCT;
+TOK_INTERSECTALL;
+TOK_INTERSECTDISTINCT;
+TOK_EXCEPTALL;
+TOK_EXCEPTDISTINCT;
 TOK_JOIN;
 TOK_LEFTOUTERJOIN;
 TOK_RIGHTOUTERJOIN;
@@ -252,6 +257,8 @@ TOK_ALTERVIEW_DROPPARTS;
 TOK_ALTERVIEW_RENAME;
 TOK_CREATE_MATERIALIZED_VIEW;
 TOK_DROP_MATERIALIZED_VIEW;
+TOK_REWRITE_ENABLED;
+TOK_REWRITE_DISABLED;
 TOK_VIEWPARTCOLS;
 TOK_EXPLAIN;
 TOK_EXPLAIN_SQ_REWRITE;
@@ -267,11 +274,6 @@ TOK_TABLEPROPERTY;
 TOK_IFEXISTS;
 TOK_IFNOTEXISTS;
 TOK_ORREPLACE;
-TOK_HINTLIST;
-TOK_HINT;
-TOK_MAPJOIN;
-TOK_STREAMTABLE;
-TOK_HINTARGLIST;
 TOK_USERSCRIPTCOLNAMES;
 TOK_USERSCRIPTCOLSCHEMA;
 TOK_RECORDREADER;
@@ -380,11 +382,23 @@ TOK_ROLLBACK;
 TOK_SET_AUTOCOMMIT;
 TOK_CACHE_METADATA;
 TOK_ABORT_TRANSACTIONS;
+TOK_MERGE;
+TOK_MATCHED;
+TOK_NOT_MATCHED;
+TOK_UPDATE;
+TOK_DELETE;
+TOK_REPL_DUMP;
+TOK_REPL_LOAD;
+TOK_REPL_STATUS;
+TOK_TO;
 TOK_ONLY;
 TOK_SUMMARY;
 TOK_OPERATOR;
 TOK_EXPRESSION;
 TOK_DETAIL;
+TOK_BLOCKING;
+TOK_LIKEANY;
+TOK_LIKEALL;
 }
 
 
@@ -454,6 +468,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
     xlateMap.put("KW_DISTRIBUTE", "DISTRIBUTE");
     xlateMap.put("KW_SORT", "SORT");
     xlateMap.put("KW_UNION", "UNION");
+    xlateMap.put("KW_INTERSECT", "INTERSECT");
+    xlateMap.put("KW_EXCEPT", "EXCEPT");
     xlateMap.put("KW_LOAD", "LOAD");
     xlateMap.put("KW_DATA", "DATA");
     xlateMap.put("KW_INPATH", "INPATH");
@@ -546,6 +562,9 @@ import org.apache.hadoop.hive.conf.HiveConf;
     xlateMap.put("KW_NORELY", "NORELY");
     xlateMap.put("KW_ABORT", "ABORT");
     xlateMap.put("KW_TRANSACTIONS", "TRANSACTIONS");
+    xlateMap.put("KW_COMPACTIONS", "COMPACTIONS");
+    xlateMap.put("KW_COMPACT", "COMPACT");
+    xlateMap.put("KW_WAIT", "WAIT");
 
     // Operators
     xlateMap.put("DOT", ".");
@@ -753,10 +772,14 @@ execStatement
     | loadStatement
     | exportStatement
     | importStatement
+    | replDumpStatement
+    | replLoadStatement
+    | replStatusStatement
     | ddlStatement
     | deleteStatement
     | updateStatement
     | sqlTransactionStatement
+    | mergeStatement
     ;
 
 loadStatement
@@ -792,6 +815,35 @@ importStatement
          tableLocation?
     -> ^(TOK_IMPORT $path $tab? $ext? tableLocation?)
     ;
+
+replDumpStatement
+@init { pushMsg("replication dump statement", state); }
+@after { popMsg(state); }
+      : KW_REPL KW_DUMP
+        (dbName=identifier) (DOT tblName=identifier)?
+        (KW_FROM (eventId=Number)
+          (KW_TO (rangeEnd=Number))?
+          (KW_LIMIT (batchSize=Number))?
+        )?
+    -> ^(TOK_REPL_DUMP $dbName $tblName? ^(TOK_FROM $eventId (TOK_TO $rangeEnd)? (TOK_LIMIT $batchSize)?)? )
+    ;
+
+replLoadStatement
+@init { pushMsg("replication load statement", state); }
+@after { popMsg(state); }
+      : KW_REPL KW_LOAD
+        ((dbName=identifier) (DOT tblName=identifier)?)?
+        KW_FROM (path=StringLiteral)
+      -> ^(TOK_REPL_LOAD $path $dbName? $tblName?)
+      ;
+
+replStatusStatement
+@init { pushMsg("replication load statement", state); }
+@after { popMsg(state); }
+      : KW_REPL KW_STATUS
+        (dbName=identifier) (DOT tblName=identifier)?
+      -> ^(TOK_REPL_STATUS $dbName $tblName?)
+      ;
 
 ddlStatement
 @init { pushMsg("ddl statement", state); }
@@ -858,6 +910,20 @@ ifNotExists
 @after { popMsg(state); }
     : KW_IF KW_NOT KW_EXISTS
     -> ^(TOK_IFNOTEXISTS)
+    ;
+
+rewriteEnabled
+@init { pushMsg("rewrite enabled clause", state); }
+@after { popMsg(state); }
+    : KW_ENABLE KW_REWRITE
+    -> ^(TOK_REWRITE_ENABLED)
+    ;
+
+rewriteDisabled
+@init { pushMsg("rewrite disabled clause", state); }
+@after { popMsg(state); }
+    : KW_DISABLE KW_REWRITE
+    -> ^(TOK_REWRITE_DISABLED)
     ;
 
 storedAsDirs
@@ -1386,11 +1452,16 @@ alterStatementSuffixBucketNum
     -> ^(TOK_ALTERTABLE_BUCKETS $num)
     ;
 
+blocking
+  : KW_AND KW_WAIT
+  -> TOK_BLOCKING
+  ;
+
 alterStatementSuffixCompact
 @init { msgs.push("compaction request"); }
 @after { msgs.pop(); }
-    : KW_COMPACT compactType=StringLiteral (KW_WITH KW_OVERWRITE KW_TBLPROPERTIES tableProperties)?
-    -> ^(TOK_ALTERTABLE_COMPACT $compactType tableProperties?)
+    : KW_COMPACT compactType=StringLiteral blocking? (KW_WITH KW_OVERWRITE KW_TBLPROPERTIES tableProperties)?
+    -> ^(TOK_ALTERTABLE_COMPACT $compactType blocking? tableProperties?)
     ;
 
 
@@ -1810,10 +1881,11 @@ createMaterializedViewStatement
 }
 @after { popMsg(state); }
     : KW_CREATE KW_MATERIALIZED KW_VIEW (ifNotExists)? name=tableName
-        tableComment? tableRowFormat? tableFileFormat? tableLocation?
+        rewriteEnabled? tableComment? tableRowFormat? tableFileFormat? tableLocation?
         tablePropertiesPrefixed? KW_AS selectStatementWithCTE
     -> ^(TOK_CREATE_MATERIALIZED_VIEW $name 
          ifNotExists?
+         rewriteEnabled?
          tableComment?
          tableRowFormat?
          tableFileFormat?
@@ -2075,7 +2147,7 @@ columnNameOrderList
 columnParenthesesList
 @init { pushMsg("column parentheses list", state); }
 @after { popMsg(state); }
-    : LPAREN columnNameList RPAREN
+    : LPAREN! columnNameList RPAREN!
     ;
 
 enableSpecification
@@ -2328,6 +2400,12 @@ setOperator
 @after { popMsg(state); }
     : KW_UNION KW_ALL -> ^(TOK_UNIONALL)
     | KW_UNION KW_DISTINCT? -> ^(TOK_UNIONDISTINCT)
+    | KW_INTERSECT KW_ALL -> ^(TOK_INTERSECTALL)
+    | KW_INTERSECT KW_DISTINCT? -> ^(TOK_INTERSECTDISTINCT)
+    | KW_EXCEPT KW_ALL -> ^(TOK_EXCEPTALL)
+    | KW_EXCEPT KW_DISTINCT? -> ^(TOK_EXCEPTDISTINCT)
+    | KW_MINUS KW_ALL -> ^(TOK_EXCEPTALL)
+    | KW_MINUS KW_DISTINCT? -> ^(TOK_EXCEPTDISTINCT)
     ;
 
 queryStatementExpression
@@ -2376,7 +2454,7 @@ fromStatement
 	        )
 	       ^(TOK_INSERT 
 	          ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-	          ^(TOK_SELECT ^(TOK_SELEXPR TOK_ALLCOLREF))
+	          ^(TOK_SELECT ^(TOK_SELEXPR TOK_SETCOLREF))
 	        )
 	      )
     -> {$fromStatement.tree}
@@ -2460,7 +2538,7 @@ selectStatement
           )
           ^(TOK_INSERT
              ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-             ^(TOK_SELECT ^(TOK_SELEXPR TOK_ALLCOLREF))
+             ^(TOK_SELECT ^(TOK_SELEXPR TOK_SETCOLREF))
              $o? $c? $d? $sort? $l?
           )
       )
@@ -2469,7 +2547,7 @@ selectStatement
 setOpSelectStatement[CommonTree t]
    :
    (u=setOperator b=atomSelectStatement
-   -> {$setOpSelectStatement.tree != null && u.tree.getType()==HiveParser.TOK_UNIONDISTINCT}?
+   -> {$setOpSelectStatement.tree != null && ((CommonTree)u.getTree()).getType()==HiveParser.TOK_UNIONDISTINCT}?
       ^(TOK_QUERY
           ^(TOK_FROM
             ^(TOK_SUBQUERY
@@ -2479,12 +2557,12 @@ setOpSelectStatement[CommonTree t]
           )
           ^(TOK_INSERT
              ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-             ^(TOK_SELECTDI ^(TOK_SELEXPR TOK_ALLCOLREF))
+             ^(TOK_SELECTDI ^(TOK_SELEXPR TOK_SETCOLREF))
           )
        )
-   -> {$setOpSelectStatement.tree != null && u.tree.getType()!=HiveParser.TOK_UNIONDISTINCT}?
-      ^(TOK_UNIONALL {$setOpSelectStatement.tree} $b)
-   -> {$setOpSelectStatement.tree == null && u.tree.getType()==HiveParser.TOK_UNIONDISTINCT}?
+   -> {$setOpSelectStatement.tree != null && ((CommonTree)u.getTree()).getType()!=HiveParser.TOK_UNIONDISTINCT}?
+      ^($u {$setOpSelectStatement.tree} $b)
+   -> {$setOpSelectStatement.tree == null && ((CommonTree)u.getTree()).getType()==HiveParser.TOK_UNIONDISTINCT}?
       ^(TOK_QUERY
           ^(TOK_FROM
             ^(TOK_SUBQUERY
@@ -2494,12 +2572,16 @@ setOpSelectStatement[CommonTree t]
            )
           ^(TOK_INSERT
             ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-            ^(TOK_SELECTDI ^(TOK_SELEXPR TOK_ALLCOLREF))
+            ^(TOK_SELECTDI ^(TOK_SELEXPR TOK_SETCOLREF))
          )
        )
-   -> ^(TOK_UNIONALL {$t} $b)
+   -> ^($u {$t} $b)
    )+
-   -> {$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_UNIONALL}?
+   -> {$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_UNIONALL
+   ||$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_INTERSECTDISTINCT
+   ||$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_INTERSECTALL
+   ||$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_EXCEPTDISTINCT
+   ||$setOpSelectStatement.tree.getChild(0).getType()==HiveParser.TOK_EXCEPTALL}?
       ^(TOK_QUERY
           ^(TOK_FROM
             ^(TOK_SUBQUERY
@@ -2509,7 +2591,7 @@ setOpSelectStatement[CommonTree t]
           )
           ^(TOK_INSERT
              ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-             ^(TOK_SELECT ^(TOK_SELEXPR TOK_ALLCOLREF))
+             ^(TOK_SELECT ^(TOK_SELEXPR TOK_SETCOLREF))
           )
        )
    -> {$setOpSelectStatement.tree}
@@ -2680,3 +2762,55 @@ abortTransactionStatement
   :
   KW_ABORT KW_TRANSACTIONS ( Number )+ -> ^(TOK_ABORT_TRANSACTIONS ( Number )+)
   ;
+
+
+/*
+BEGIN SQL Merge statement
+*/
+mergeStatement
+@init { pushMsg("MERGE statement", state); }
+@after { popMsg(state); }
+   :
+   KW_MERGE KW_INTO tableName (KW_AS? identifier)? KW_USING joinSourcePart KW_ON expression whenClauses ->
+    ^(TOK_MERGE ^(TOK_TABREF tableName identifier?) joinSourcePart expression whenClauses)
+   ;
+/*
+Allow 0,1 or 2 WHEN MATCHED clauses and 0 or 1 WHEN NOT MATCHED
+Each WHEN clause may have AND <boolean predicate>.
+If 2 WHEN MATCHED clauses are present, 1 must be UPDATE the other DELETE and the 1st one
+must have AND <boolean predicate>
+*/
+whenClauses
+   :
+   (whenMatchedAndClause|whenMatchedThenClause)* whenNotMatchedClause?
+   ;
+whenNotMatchedClause
+@init { pushMsg("WHEN NOT MATCHED clause", state); }
+@after { popMsg(state); }
+   :
+  KW_WHEN KW_NOT KW_MATCHED (KW_AND expression)? KW_THEN KW_INSERT KW_VALUES valueRowConstructor ->
+    ^(TOK_NOT_MATCHED ^(TOK_INSERT valueRowConstructor) expression?)
+  ;
+whenMatchedAndClause
+@init { pushMsg("WHEN MATCHED AND clause", state); }
+@after { popMsg(state); }
+  :
+  KW_WHEN KW_MATCHED KW_AND expression KW_THEN updateOrDelete ->
+    ^(TOK_MATCHED updateOrDelete expression)
+  ;
+whenMatchedThenClause
+@init { pushMsg("WHEN MATCHED THEN clause", state); }
+@after { popMsg(state); }
+  :
+  KW_WHEN KW_MATCHED KW_THEN updateOrDelete ->
+     ^(TOK_MATCHED updateOrDelete)
+  ;
+updateOrDelete
+   :
+   KW_UPDATE setColumnsClause -> ^(TOK_UPDATE setColumnsClause)
+   |
+   KW_DELETE -> TOK_DELETE
+   ;
+/*
+END SQL Merge statement
+*/

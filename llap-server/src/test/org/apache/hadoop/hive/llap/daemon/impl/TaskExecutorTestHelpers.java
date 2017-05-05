@@ -25,6 +25,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.llap.daemon.FragmentCompletionHandler;
 import org.apache.hadoop.hive.llap.daemon.KilledTaskHandler;
+import org.apache.hadoop.hive.llap.daemon.SchedulerFragmentCompletingListener;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.QueryIdentifierProto;
 import org.apache.hadoop.hive.llap.daemon.rpc.LlapDaemonProtocolProtos.SignableVertexSpec;
@@ -43,14 +44,28 @@ import org.apache.tez.runtime.task.TaskRunner2Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.SocketFactory;
+
 public class TaskExecutorTestHelpers {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestTaskExecutorService.class);
 
-  public static MockRequest createMockRequest(int fragmentNum, int parallelism, long startTime,
-                                              boolean canFinish, long workTime) {
+  public static MockRequest createMockRequest(int fragmentNum, int parallelism, long firstAttemptStartTime,
+    long currentAttemptStartTime, boolean canFinish, long workTime) {
     SubmitWorkRequestProto
-        request = createSubmitWorkRequestProto(fragmentNum, parallelism, startTime);
+        request = createSubmitWorkRequestProto(fragmentNum, parallelism, firstAttemptStartTime, currentAttemptStartTime);
+    return createMockRequest(canFinish, workTime, request);
+  }
+
+  public static MockRequest createMockRequest(int fragmentNum, int parallelism,
+                                              int withinDagPriority,
+                                              long firstAttemptStartTime,
+                                              long currentAttemptStartTime,
+                                              boolean canFinish,
+                                              long workTime) {
+    SubmitWorkRequestProto
+        request = createSubmitWorkRequestProto(fragmentNum, parallelism, 0,
+        firstAttemptStartTime, currentAttemptStartTime, withinDagPriority);
     return createMockRequest(canFinish, workTime, request);
   }
 
@@ -78,21 +93,36 @@ public class TaskExecutorTestHelpers {
         new QueryInfo(queryIdentifier, "fake_app_id_string", "fake_dag_id_string", "fake_dag_name",
             "fakeHiveQueryId", 1, "fakeUser",
             new ConcurrentHashMap<String, LlapDaemonProtocolProtos.SourceStateProto>(),
-            new String[0], null, "fakeUser", null);
+            new String[0], null, "fakeUser", null, null);
     return queryInfo;
   }
 
   public static SubmitWorkRequestProto createSubmitWorkRequestProto(
-      int fragmentNumber, int selfAndUpstreamParallelism,
-      long attemptStartTime) {
-    return createSubmitWorkRequestProto(fragmentNumber, selfAndUpstreamParallelism, 0,
-        attemptStartTime, 1);
+      int fragmentNumber, int selfAndUpstreamParallelism, long firstAttemptStartTime,
+      long currentAttemptStartTime) {
+    return createSubmitWorkRequestProto(fragmentNumber, selfAndUpstreamParallelism, 0, firstAttemptStartTime,
+      currentAttemptStartTime, 1);
+  }
+
+  public static SubmitWorkRequestProto createSubmitWorkRequestProto(
+      int fragmentNumber, int selfAndUpstreamParallelism, long firstAttemptStartTime,
+      long currentAttemptStartTime, String dagName) {
+    return createSubmitWorkRequestProto(fragmentNumber, selfAndUpstreamParallelism, 0, firstAttemptStartTime,
+        currentAttemptStartTime, 1, dagName);
   }
 
   public static SubmitWorkRequestProto createSubmitWorkRequestProto(
       int fragmentNumber, int selfAndUpstreamParallelism,
-      int selfAndUpstreamComplete,
-      long attemptStartTime, int withinDagPriority) {
+      int selfAndUpstreamComplete, long firstAttemptStartTime,
+      long currentAttemptStartTime, int withinDagPriority) {
+    return createSubmitWorkRequestProto(fragmentNumber, selfAndUpstreamParallelism, 0, firstAttemptStartTime,
+        currentAttemptStartTime, withinDagPriority, "MockDag");
+  }
+
+  public static SubmitWorkRequestProto createSubmitWorkRequestProto(
+      int fragmentNumber, int selfAndUpstreamParallelism,
+      int selfAndUpstreamComplete, long firstAttemptStartTime,
+      long currentAttemptStartTime, int withinDagPriority, String dagName) {
     ApplicationId appId = ApplicationId.newInstance(9999, 72);
     TezDAGID dagId = TezDAGID.getInstance(appId, 1);
     TezVertexID vId = TezVertexID.getInstance(dagId, 35);
@@ -103,7 +133,8 @@ public class TaskExecutorTestHelpers {
         .setWorkSpec(
             VertexOrBinary.newBuilder().setVertex(
             SignableVertexSpec.newBuilder()
-                .setDagName("MockDag")
+                .setDagName(dagName)
+                .setHiveQueryId(dagName)
                 .setUser("MockUser")
                 .setTokenIdentifier("MockToken_1")
                 .setQueryIdentifier(
@@ -124,7 +155,8 @@ public class TaskExecutorTestHelpers {
         .setFragmentRuntimeInfo(LlapDaemonProtocolProtos
             .FragmentRuntimeInfo
             .newBuilder()
-            .setFirstAttemptStartTime(attemptStartTime)
+            .setFirstAttemptStartTime(firstAttemptStartTime)
+            .setCurrentAttemptStartTime(currentAttemptStartTime)
             .setNumSelfAndUpstreamTasks(selfAndUpstreamParallelism)
             .setNumSelfAndUpstreamCompletedTasks(selfAndUpstreamComplete)
             .setWithinDagPriority(withinDagPriority)
@@ -146,6 +178,8 @@ public class TaskExecutorTestHelpers {
     private final Condition sleepCondition = lock.newCondition();
     private boolean shouldSleep = true;
     private final Condition finishedCondition = lock.newCondition();
+    private final Object killDelay = new Object();
+    private boolean isOkToFinish = true;
 
     public MockRequest(SubmitWorkRequestProto requestProto, QueryFragmentInfo fragmentInfo,
                        boolean canFinish, long workTime, TezEvent initialEvent) {
@@ -154,7 +188,8 @@ public class TaskExecutorTestHelpers {
               LlapDaemonExecutorMetrics.class),
           mock(KilledTaskHandler.class), mock(
               FragmentCompletionHandler.class), new DefaultHadoopShim(), null,
-              requestProto.getWorkSpec().getVertex(), initialEvent, null);
+              requestProto.getWorkSpec().getVertex(), initialEvent, null, mock(
+              SchedulerFragmentCompletingListener.class), mock(SocketFactory.class));
       this.workTime = workTime;
       this.canFinish = canFinish;
     }
@@ -174,17 +209,19 @@ public class TaskExecutorTestHelpers {
         lock.lock();
         try {
           if (shouldSleep) {
+            logInfo(super.getRequestId() + " is sleeping for " + workTime, null);
             sleepCondition.await(workTime, TimeUnit.MILLISECONDS);
           }
         } catch (InterruptedException e) {
           wasInterrupted.set(true);
-          return new TaskRunner2Result(EndReason.KILL_REQUESTED, null, null, false);
+          return handleKill();
         } finally {
           lock.unlock();
         }
         if (wasKilled.get()) {
-          return new TaskRunner2Result(EndReason.KILL_REQUESTED, null, null, false);
+          return handleKill();
         } else {
+          logInfo(super.getRequestId() + " succeeded", null);
           return new TaskRunner2Result(EndReason.SUCCESS, null, null, false);
         }
       } finally {
@@ -195,6 +232,33 @@ public class TaskExecutorTestHelpers {
         } finally {
           lock.unlock();
         }
+      }
+    }
+
+    private TaskRunner2Result handleKill() {
+      boolean hasLogged = false;
+      while (true) {
+        synchronized (killDelay) {
+          if (isOkToFinish) break;
+          if (!hasLogged) {
+            logInfo("Waiting after the kill: " + getRequestId());
+            hasLogged = true;
+          }
+          try {
+            killDelay.wait(100);
+          } catch (InterruptedException e) {
+          }
+        }
+      }
+      logInfo("Finished with the kill: " + getRequestId());
+      return new TaskRunner2Result(EndReason.KILL_REQUESTED, null, null, false);
+    }
+
+    public void unblockKill() {
+      synchronized (killDelay) {
+        logInfo("Unblocking the kill: " + getRequestId());
+        isOkToFinish = true;
+        killDelay.notifyAll();
       }
     }
 
@@ -259,6 +323,10 @@ public class TaskExecutorTestHelpers {
     public boolean canFinish() {
       return canFinish;
     }
+
+    public void setSleepAfterKill() {
+      isOkToFinish = false;
+    }
   }
 
   private static void logInfo(String message, Throwable t) {
@@ -268,5 +336,6 @@ public class TaskExecutorTestHelpers {
   private static void logInfo(String message) {
     logInfo(message, null);
   }
+
 
 }

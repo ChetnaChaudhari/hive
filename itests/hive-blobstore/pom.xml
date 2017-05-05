@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache.hive</groupId>
     <artifactId>hive-it</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>3.0.0-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -39,39 +39,8 @@
     <test.dfs.mkdir>-mkdir -p</test.dfs.mkdir>
   </properties>
 
-  <profiles>
-    <profile>
-      <id>tests-off</id>
-      <activation>
-        <file>
-          <missing>src/test/resources/blobstore-conf.xml</missing>
-        </file>
-      </activation>
-      <properties>
-        <maven.test.skip>true</maven.test.skip>
-      </properties>
-    </profile>
-    <profile>
-      <id>tests-on</id>
-      <activation>
-        <file>
-          <exists>src/test/resources/blobstore-conf.xml</exists>
-        </file>
-      </activation>
-      <properties>
-        <maven.test.skip>false</maven.test.skip>
-      </properties>
-    </profile>
-  </profiles>
-
   <dependencies>
     <!-- dependencies are always listed in sorted order by groupId, artifactId -->
-    <dependency>
-      <groupId>org.apache.hive</groupId>
-      <artifactId>hive-ant</artifactId>
-      <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-common</artifactId>

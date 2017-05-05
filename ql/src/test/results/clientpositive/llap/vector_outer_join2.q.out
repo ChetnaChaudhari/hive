@@ -1,11 +1,9 @@
-PREHOOK: query: -- Using cint and cbigint in test queries
-create table small_alltypesorc1a as select * from alltypesorc where cint is not null and cbigint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
+PREHOOK: query: create table small_alltypesorc1a as select * from alltypesorc where cint is not null and cbigint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@alltypesorc
 PREHOOK: Output: database:default
 PREHOOK: Output: default@small_alltypesorc1a
-POSTHOOK: query: -- Using cint and cbigint in test queries
-create table small_alltypesorc1a as select * from alltypesorc where cint is not null and cbigint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
+POSTHOOK: query: create table small_alltypesorc1a as select * from alltypesorc where cint is not null and cbigint is not null order by ctinyint, csmallint, cint, cbigint, cfloat, cdouble, cstring1, cstring2, ctimestamp1, ctimestamp2, cboolean1, cboolean2 limit 5
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@alltypesorc
 POSTHOOK: Output: database:default
@@ -193,10 +191,12 @@ POSTHOOK: Output: default@small_alltypesorc_a
 PREHOOK: query: ANALYZE TABLE small_alltypesorc_a COMPUTE STATISTICS FOR COLUMNS
 PREHOOK: type: QUERY
 PREHOOK: Input: default@small_alltypesorc_a
+PREHOOK: Output: default@small_alltypesorc_a
 #### A masked pattern was here ####
 POSTHOOK: query: ANALYZE TABLE small_alltypesorc_a COMPUTE STATISTICS FOR COLUMNS
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@small_alltypesorc_a
+POSTHOOK: Output: default@small_alltypesorc_a
 #### A masked pattern was here ####
 PREHOOK: query: select * from small_alltypesorc_a
 PREHOOK: type: QUERY
@@ -258,7 +258,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE), Map 4 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -289,7 +289,7 @@ STAGE PLANS:
                           bigTableValueColumns: [3]
                           className: VectorMapJoinOuterLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                          nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                           projectedOutputColumns: [3]
                       outputColumnNames: _col1
                       input vertices:
@@ -307,7 +307,7 @@ STAGE PLANS:
                             bigTableValueColumns: [3]
                             className: VectorMapJoinOuterLongOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, Not empty key IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
                             projectedOutputColumns: [3]
                         outputColumnNames: _col1
                         input vertices:
@@ -327,10 +327,9 @@ STAGE PLANS:
                           Reduce Output Operator
                             sort order: 
                             Reduce Sink Vectorization:
-                                className: VectorReduceSinkOperator
-                                native: false
-                                nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                                nativeConditionsNotMet: Uniform Hash IS false
+                                className: VectorReduceSinkObjectHashOperator
+                                native: true
+                                nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                             Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: COMPLETE
                             value expressions: _col0 (type: bigint), _col1 (type: bigint)
             Execution mode: vectorized, llap
@@ -371,7 +370,7 @@ STAGE PLANS:
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 20 Data size: 44 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -411,7 +410,7 @@ STAGE PLANS:
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkLongOperator
                           native: true
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 20 Data size: 88 Basic stats: COMPLETE Column stats: COMPLETE
             Execution mode: vectorized, llap
             LLAP IO: all inputs
@@ -433,6 +432,8 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                reduceColumnNullOrder: 
+                reduceColumnSortOrder: 
                 groupByVectorOutput: true
                 allNative: false
                 usesVectorUDFAdaptor: false
@@ -470,9 +471,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-select count(*), sum(t1.c_cbigint) from (select c.cbigint as c_cbigint
+PREHOOK: query: select count(*), sum(t1.c_cbigint) from (select c.cbigint as c_cbigint
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint 
@@ -482,9 +481,7 @@ left outer join small_alltypesorc_a hd
 PREHOOK: type: QUERY
 PREHOOK: Input: default@small_alltypesorc_a
 #### A masked pattern was here ####
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-select count(*), sum(t1.c_cbigint) from (select c.cbigint as c_cbigint
+POSTHOOK: query: select count(*), sum(t1.c_cbigint) from (select c.cbigint as c_cbigint
 from small_alltypesorc_a c
 left outer join small_alltypesorc_a cd
   on cd.cint = c.cint 

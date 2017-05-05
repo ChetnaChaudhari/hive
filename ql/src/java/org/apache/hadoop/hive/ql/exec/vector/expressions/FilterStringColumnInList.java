@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.exec.vector.expressions;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
@@ -184,6 +185,11 @@ public class FilterStringColumnInList extends VectorExpression implements IStrin
 
   @Override
   public String vectorExpressionParameters() {
-    return "col " + inputCol + ", values " + Arrays.toString(inListValues);
+    StringBuilder sb = new StringBuilder();
+    sb.append("col ");
+    sb.append(inputCol);
+    sb.append(", values ");
+    sb.append(displayArrayOfUtf8ByteArrays(inListValues));
+    return sb.toString();
   }
 }

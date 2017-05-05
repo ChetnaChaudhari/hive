@@ -1,6 +1,4 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION EXPRESSION
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT   cboolean1,
          ctinyint,
          ctimestamp1,
@@ -33,9 +31,7 @@ GROUP BY cboolean1, ctinyint, ctimestamp1, cfloat, cstring1
 ORDER BY cboolean1, ctinyint, ctimestamp1, cfloat, cstring1, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16
 LIMIT 40
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION EXPRESSION
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT   cboolean1,
          ctinyint,
          ctimestamp1,
@@ -100,12 +96,12 @@ STAGE PLANS:
                     predicate: (((cfloat < 3569) and (10.175 >= cdouble) and (cboolean1 <> 1)) or ((UDFToDouble(ctimestamp1) > 11.0) and (UDFToDouble(ctimestamp2) <> 12.0) and (CAST( ctinyint AS decimal(11,4)) < 9763215.5639))) (type: boolean)
                     Statistics: Num rows: 2730 Data size: 83809 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
-                      expressions: cboolean1 (type: boolean), ctinyint (type: tinyint), ctimestamp1 (type: timestamp), cfloat (type: float), cstring1 (type: string)
-                      outputColumnNames: cboolean1, ctinyint, ctimestamp1, cfloat, cstring1
+                      expressions: ctinyint (type: tinyint), cfloat (type: float), cstring1 (type: string), ctimestamp1 (type: timestamp), cboolean1 (type: boolean)
+                      outputColumnNames: ctinyint, cfloat, cstring1, ctimestamp1, cboolean1
                       Select Vectorization:
                           className: VectorSelectOperator
                           native: true
-                          projectedOutputColumns: [10, 0, 8, 4, 6]
+                          projectedOutputColumns: [0, 4, 6, 8, 10]
                       Statistics: Num rows: 2730 Data size: 83809 Basic stats: COMPLETE Column stats: NONE
                       Group By Operator
                         aggregations: max(ctinyint), sum(cfloat), stddev_pop(cfloat), stddev_pop(ctinyint), max(cfloat), min(ctinyint)
@@ -307,8 +303,7 @@ NULL	-63	1969-12-31 16:00:15.436	-63.0	NULL	63	-63	0	-63.0	-0.0	63.0	-5011.839	0
 NULL	-64	1969-12-31 16:00:11.912	-64.0	NULL	64	-64	0	-64.0	-0.0	64.0	-5091.392	0.0	64.0	0.0	-10.175	-64.0	0.410625	-64.0	0.0	-64
 NULL	-64	1969-12-31 16:00:12.339	-64.0	NULL	64	-64	0	-64.0	-0.0	64.0	-5091.392	0.0	64.0	0.0	-10.175	-64.0	0.410625	-64.0	0.0	-64
 NULL	-64	1969-12-31 16:00:13.274	-64.0	NULL	64	-64	0	-64.0	-0.0	64.0	-5091.392	0.0	64.0	0.0	-10.175	-64.0	0.410625	-64.0	0.0	-64
-PREHOOK: query: -- double compare timestamp
-EXPLAIN VECTORIZATION EXPRESSION
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT   cboolean1,
          ctinyint,
          ctimestamp1,
@@ -341,8 +336,7 @@ GROUP BY cboolean1, ctinyint, ctimestamp1, cfloat, cstring1
 ORDER BY cboolean1, ctinyint, ctimestamp1, cfloat, cstring1, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16
 LIMIT 40
 PREHOOK: type: QUERY
-POSTHOOK: query: -- double compare timestamp
-EXPLAIN VECTORIZATION EXPRESSION
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT   cboolean1,
          ctinyint,
          ctimestamp1,
@@ -407,12 +401,12 @@ STAGE PLANS:
                     predicate: (((cfloat < 3569) and (10.175 >= cdouble) and (cboolean1 <> 1)) or ((UDFToDouble(ctimestamp1) > -1.388) and (UDFToDouble(ctimestamp2) <> -1.3359999999999999) and (CAST( ctinyint AS decimal(11,4)) < 9763215.5639))) (type: boolean)
                     Statistics: Num rows: 2730 Data size: 83809 Basic stats: COMPLETE Column stats: NONE
                     Select Operator
-                      expressions: cboolean1 (type: boolean), ctinyint (type: tinyint), ctimestamp1 (type: timestamp), cfloat (type: float), cstring1 (type: string)
-                      outputColumnNames: cboolean1, ctinyint, ctimestamp1, cfloat, cstring1
+                      expressions: ctinyint (type: tinyint), cfloat (type: float), cstring1 (type: string), ctimestamp1 (type: timestamp), cboolean1 (type: boolean)
+                      outputColumnNames: ctinyint, cfloat, cstring1, ctimestamp1, cboolean1
                       Select Vectorization:
                           className: VectorSelectOperator
                           native: true
-                          projectedOutputColumns: [10, 0, 8, 4, 6]
+                          projectedOutputColumns: [0, 4, 6, 8, 10]
                       Statistics: Num rows: 2730 Data size: 83809 Basic stats: COMPLETE Column stats: NONE
                       Group By Operator
                         aggregations: max(ctinyint), sum(cfloat), stddev_pop(cfloat), stddev_pop(ctinyint), max(cfloat), min(ctinyint)

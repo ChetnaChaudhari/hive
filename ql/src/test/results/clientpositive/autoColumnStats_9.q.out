@@ -1,12 +1,8 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-CREATE TABLE dest_j1(key INT, value STRING) STORED AS TEXTFILE
+PREHOOK: query: CREATE TABLE dest_j1(key INT, value STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@dest_j1
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-CREATE TABLE dest_j1(key INT, value STRING) STORED AS TEXTFILE
+POSTHOOK: query: CREATE TABLE dest_j1(key INT, value STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest_j1
@@ -257,6 +253,7 @@ POSTHOOK: Input: default@dest_j1
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 key                 	int                 	0                   	498                 	0                   	196                 	                    	                    	                    	                    	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}	 	 	 	 	 	 	 	 	 
 PREHOOK: query: desc formatted dest_j1 value
 PREHOOK: type: DESCTABLE
 PREHOOK: Input: default@dest_j1
@@ -266,3 +263,4 @@ POSTHOOK: Input: default@dest_j1
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 value               	string              	                    	                    	0                   	214                 	6.834630350194552   	7                   	                    	                    	from deserializer   
+COLUMN_STATS_ACCURATE	{\"BASIC_STATS\":\"true\",\"COLUMN_STATS\":{\"key\":\"true\",\"value\":\"true\"}}	 	 	 	 	 	 	 	 	 

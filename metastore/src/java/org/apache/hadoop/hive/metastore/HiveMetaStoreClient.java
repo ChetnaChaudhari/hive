@@ -18,134 +18,8 @@
 
 package org.apache.hadoop.hive.metastore;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hive.common.ObjectPair;
-import org.apache.hadoop.hive.common.ValidTxnList;
-import org.apache.hadoop.hive.common.classification.InterfaceAudience;
-import org.apache.hadoop.hive.common.classification.InterfaceAudience.Public;
-import org.apache.hadoop.hive.common.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.conf.HiveConfUtil;
-import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
-import org.apache.hadoop.hive.metastore.api.AbortTxnsRequest;
-import org.apache.hadoop.hive.metastore.api.AddDynamicPartitions;
-import org.apache.hadoop.hive.metastore.api.AddForeignKeyRequest;
-import org.apache.hadoop.hive.metastore.api.AddPartitionsRequest;
-import org.apache.hadoop.hive.metastore.api.AddPartitionsResult;
-import org.apache.hadoop.hive.metastore.api.AddPrimaryKeyRequest;
-import org.apache.hadoop.hive.metastore.api.AggrStats;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.CacheFileMetadataRequest;
-import org.apache.hadoop.hive.metastore.api.CacheFileMetadataResult;
-import org.apache.hadoop.hive.metastore.api.CheckLockRequest;
-import org.apache.hadoop.hive.metastore.api.ClearFileMetadataRequest;
-import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
-import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
-import org.apache.hadoop.hive.metastore.api.CommitTxnRequest;
-import org.apache.hadoop.hive.metastore.api.CompactionRequest;
-import org.apache.hadoop.hive.metastore.api.CompactionType;
-import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
-import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
-import org.apache.hadoop.hive.metastore.api.DataOperationType;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.DropConstraintRequest;
-import org.apache.hadoop.hive.metastore.api.DropPartitionsExpr;
-import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
-import org.apache.hadoop.hive.metastore.api.EnvironmentContext;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.FireEventRequest;
-import org.apache.hadoop.hive.metastore.api.FireEventResponse;
-import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
-import org.apache.hadoop.hive.metastore.api.Function;
-import org.apache.hadoop.hive.metastore.api.GetAllFunctionsResponse;
-import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprRequest;
-import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprResult;
-import org.apache.hadoop.hive.metastore.api.GetFileMetadataRequest;
-import org.apache.hadoop.hive.metastore.api.GetFileMetadataResult;
-import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
-import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleRequest;
-import org.apache.hadoop.hive.metastore.api.GetPrincipalsInRoleResponse;
-import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalRequest;
-import org.apache.hadoop.hive.metastore.api.GetRoleGrantsForPrincipalResponse;
-import org.apache.hadoop.hive.metastore.api.GrantRevokePrivilegeRequest;
-import org.apache.hadoop.hive.metastore.api.GrantRevokePrivilegeResponse;
-import org.apache.hadoop.hive.metastore.api.GrantRevokeRoleRequest;
-import org.apache.hadoop.hive.metastore.api.GrantRevokeRoleResponse;
-import org.apache.hadoop.hive.metastore.api.GrantRevokeType;
-import org.apache.hadoop.hive.metastore.api.HeartbeatRequest;
-import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeRequest;
-import org.apache.hadoop.hive.metastore.api.HeartbeatTxnRangeResponse;
-import org.apache.hadoop.hive.metastore.api.HiveObjectPrivilege;
-import org.apache.hadoop.hive.metastore.api.HiveObjectRef;
-import org.apache.hadoop.hive.metastore.api.Index;
-import org.apache.hadoop.hive.metastore.api.InvalidInputException;
-import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.InvalidPartitionException;
-import org.apache.hadoop.hive.metastore.api.LockRequest;
-import org.apache.hadoop.hive.metastore.api.LockResponse;
-import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.MetadataPpdResult;
-import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
-import org.apache.hadoop.hive.metastore.api.NotificationEvent;
-import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
-import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
-import org.apache.hadoop.hive.metastore.api.OpenTxnRequest;
-import org.apache.hadoop.hive.metastore.api.OpenTxnsResponse;
-import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.PartitionEventType;
-import org.apache.hadoop.hive.metastore.api.PartitionsByExprRequest;
-import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
-import org.apache.hadoop.hive.metastore.api.PartitionsStatsRequest;
-import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
-import org.apache.hadoop.hive.metastore.api.PrincipalPrivilegeSet;
-import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
-import org.apache.hadoop.hive.metastore.api.PutFileMetadataRequest;
-import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
-import org.apache.hadoop.hive.metastore.api.Role;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
-import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
-import org.apache.hadoop.hive.metastore.api.ShowCompactRequest;
-import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
-import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
-import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
-import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.api.TableMeta;
-import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
-import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
-import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
-import org.apache.hadoop.hive.metastore.api.TxnOpenException;
-import org.apache.hadoop.hive.metastore.api.Type;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
-import org.apache.hadoop.hive.metastore.api.UnknownTableException;
-import org.apache.hadoop.hive.metastore.api.UnlockRequest;
-import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
-import org.apache.hadoop.hive.metastore.txn.TxnUtils;
-import org.apache.hadoop.hive.shims.ShimLoader;
-import org.apache.hadoop.hive.shims.Utils;
-import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.thrift.TApplicationException;
-import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TFramedTransport;
-import org.apache.thrift.transport.TSocket;
-import org.apache.thrift.transport.TTransport;
-import org.apache.thrift.transport.TTransportException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.security.auth.login.LoginException;
+import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_NAME;
+import static org.apache.hadoop.hive.metastore.MetaStoreUtils.isIndexTable;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -171,9 +45,41 @@ import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.security.PrivilegedExceptionAction;
 
-import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_NAME;
-import static org.apache.hadoop.hive.metastore.MetaStoreUtils.isIndexTable;
+import javax.security.auth.login.LoginException;
+
+import org.apache.hadoop.hive.common.ObjectPair;
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.auth.HiveAuthUtils;
+import org.apache.hadoop.hive.common.classification.InterfaceAudience;
+import org.apache.hadoop.hive.common.classification.InterfaceAudience.Public;
+import org.apache.hadoop.hive.common.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.conf.HiveConfUtil;
+import org.apache.hadoop.hive.metastore.api.*;
+import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
+import org.apache.hadoop.hive.metastore.txn.TxnUtils;
+import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.hive.shims.Utils;
+import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.thrift.TApplicationException;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TFramedTransport;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 
 /**
  * Hive Metastore Client.
@@ -185,6 +91,16 @@ import static org.apache.hadoop.hive.metastore.MetaStoreUtils.isIndexTable;
 @Public
 @Unstable
 public class HiveMetaStoreClient implements IMetaStoreClient {
+  /**
+   * Capabilities of the current client. If this client talks to a MetaStore server in a manner
+   * implying the usage of some expanded features that require client-side support that this client
+   * doesn't have (e.g. a getting a table of a new type), it will get back failures when the
+   * capability checking is enabled (the default).
+   */
+  public final static ClientCapabilities VERSION = null; // No capabilities.
+  public final static ClientCapabilities TEST_VERSION = new ClientCapabilities(
+      Lists.newArrayList(ClientCapability.TEST_CAPABILITY)); // Test capability for tests.
+
   ThriftHiveMetastore.Iface client = null;
   private TTransport transport = null;
   private boolean isConnected = false;
@@ -204,6 +120,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   // for thrift connects
   private int retries = 5;
   private long retryDelaySeconds = 0;
+  private final ClientCapabilities version;
 
   static final protected Logger LOG = LoggerFactory.getLogger("hive.metastore");
 
@@ -221,6 +138,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     } else {
       this.conf = new HiveConf(conf);
     }
+    version = HiveConf.getBoolVar(conf, ConfVars.HIVE_IN_TEST) ? TEST_VERSION : VERSION;
     filterHook = loadFilterHooks();
     fileMetadataBatchSize = HiveConf.getIntVar(
         conf, HiveConf.ConfVars.METASTORE_BATCH_RETRIEVE_OBJECTS_MAX);
@@ -283,6 +201,42 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     } else {
       LOG.error("NOT getting uris from conf");
       throw new MetaException("MetaStoreURIs not found in conf file");
+    }
+
+    //If HADOOP_PROXY_USER is set in env or property,
+    //then need to create metastore client that proxies as that user.
+    String HADOOP_PROXY_USER = "HADOOP_PROXY_USER";
+    String proxyUser = System.getenv(HADOOP_PROXY_USER);
+    if (proxyUser == null) {
+      proxyUser = System.getProperty(HADOOP_PROXY_USER);
+    }
+    //if HADOOP_PROXY_USER is set, create DelegationToken using real user
+    if(proxyUser != null) {
+      LOG.info(HADOOP_PROXY_USER + " is set. Using delegation "
+          + "token for HiveMetaStore connection.");
+      try {
+        UserGroupInformation.getLoginUser().getRealUser().doAs(
+            new PrivilegedExceptionAction<Void>() {
+              @Override
+              public Void run() throws Exception {
+                open();
+                return null;
+              }
+            });
+        String delegationTokenPropString = "DelegationTokenForHiveMetaStoreServer";
+        String delegationTokenStr = getDelegationToken(proxyUser, proxyUser);
+        Utils.setTokenStr(UserGroupInformation.getCurrentUser(), delegationTokenStr,
+            delegationTokenPropString);
+        this.conf.setVar(ConfVars.METASTORE_TOKEN_SIGNATURE, delegationTokenPropString);
+        close();
+      } catch (Exception e) {
+        LOG.error("Error while setting delegation token for " + proxyUser, e);
+        if(e instanceof MetaException) {
+          throw (MetaException)e;
+        } else {
+          throw new MetaException(e.getMessage());
+        }
+      }
     }
     // finally open the store
     open();
@@ -400,6 +354,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     alter_table_with_environmentContext(dbname, tbl_name, new_tbl, null);
   }
 
+  @Override
   public void alter_table_with_environmentContext(String dbname, String tbl_name, Table new_tbl,
       EnvironmentContext envContext) throws InvalidOperationException, MetaException, TException {
     client.alter_table_with_environment_context(dbname, tbl_name, new_tbl, envContext);
@@ -425,6 +380,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   private void open() throws MetaException {
     isConnected = false;
     TTransportException tte = null;
+    boolean useSSL = conf.getBoolVar(ConfVars.HIVE_METASTORE_USE_SSL);
     boolean useSasl = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_SASL);
     boolean useFramedTransport = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_FRAMED_TRANSPORT);
     boolean useCompactProtocol = conf.getBoolVar(ConfVars.METASTORE_USE_THRIFT_COMPACT_PROTOCOL);
@@ -434,8 +390,31 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     for (int attempt = 0; !isConnected && attempt < retries; ++attempt) {
       for (URI store : metastoreUris) {
         LOG.info("Trying to connect to metastore with URI " + store);
+
         try {
-          transport = new TSocket(store.getHost(), store.getPort(), clientSocketTimeout);
+          if (useSSL) {
+            try {
+              String trustStorePath = conf.getVar(ConfVars.HIVE_METASTORE_SSL_TRUSTSTORE_PATH).trim();
+              if (trustStorePath.isEmpty()) {
+                throw new IllegalArgumentException(ConfVars.HIVE_METASTORE_SSL_TRUSTSTORE_PATH.varname
+                    + " Not configured for SSL connection");
+              }
+              String trustStorePassword = ShimLoader.getHadoopShims().getPassword(conf,
+                  HiveConf.ConfVars.HIVE_METASTORE_SSL_TRUSTSTORE_PASSWORD.varname);
+
+              // Create an SSL socket and connect
+              transport = HiveAuthUtils.getSSLSocket(store.getHost(), store.getPort(), clientSocketTimeout, trustStorePath, trustStorePassword );
+              LOG.info("Opened an SSL connection to metastore, current connections: " + connCount.incrementAndGet());
+            } catch(IOException e) {
+              throw new IllegalArgumentException(e);
+            } catch(TTransportException e) {
+              tte = e;
+              throw new MetaException(e.toString());
+            }
+          } else {
+            transport = new TSocket(store.getHost(), store.getPort(), clientSocketTimeout);
+          }
+
           if (useSasl) {
             // Wrap thrift connection with SASL for secure connection.
             try {
@@ -450,25 +429,29 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
               String tokenSig = conf.getVar(ConfVars.METASTORE_TOKEN_SIGNATURE);
               // tokenSig could be null
               tokenStrForm = Utils.getTokenStrForm(tokenSig);
+
               if(tokenStrForm != null) {
                 // authenticate using delegation tokens via the "DIGEST" mechanism
                 transport = authBridge.createClientTransport(null, store.getHost(),
                     "DIGEST", tokenStrForm, transport,
-                        MetaStoreUtils.getMetaStoreSaslProperties(conf));
+                        MetaStoreUtils.getMetaStoreSaslProperties(conf, useSSL));
               } else {
                 String principalConfig =
                     conf.getVar(HiveConf.ConfVars.METASTORE_KERBEROS_PRINCIPAL);
                 transport = authBridge.createClientTransport(
                     principalConfig, store.getHost(), "KERBEROS", null,
-                    transport, MetaStoreUtils.getMetaStoreSaslProperties(conf));
+                    transport, MetaStoreUtils.getMetaStoreSaslProperties(conf, useSSL));
               }
             } catch (IOException ioe) {
               LOG.error("Couldn't create client transport", ioe);
               throw new MetaException(ioe.toString());
             }
-          } else if (useFramedTransport) {
-            transport = new TFramedTransport(transport);
+          } else {
+            if (useFramedTransport) {
+              transport = new TFramedTransport(transport);
+            }
           }
+
           final TProtocol protocol;
           if (useCompactProtocol) {
             protocol = new TCompactProtocol(transport);
@@ -477,8 +460,10 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
           }
           client = new ThriftHiveMetastore.Client(protocol);
           try {
-            transport.open();
-            LOG.info("Opened a connection to metastore, current connections: " + connCount.incrementAndGet());
+            if (!transport.isOpen()) {
+              transport.open();
+              LOG.info("Opened a connection to metastore, current connections: " + connCount.incrementAndGet());
+            }
             isConnected = true;
           } catch (TTransportException e) {
             tte = e;
@@ -540,6 +525,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     }
   }
 
+  @Override
   public String getTokenStrForm() throws IOException {
     return tokenStrForm;
    }
@@ -752,9 +738,14 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
         hook.commitCreateTable(tbl);
       }
       success = true;
-    } finally {
+    }
+    finally {
       if (!success && (hook != null)) {
-        hook.rollbackCreateTable(tbl);
+        try {
+          hook.rollbackCreateTable(tbl);
+        } catch (Exception e){
+          LOG.error("Create rollback failed with", e);
+        }
       }
     }
   }
@@ -1087,7 +1078,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     try {
       drop_table_with_environment_context(dbname, name, deleteData, envContext);
       if (hook != null) {
-        hook.commitDropTable(tbl, deleteData);
+        hook.commitDropTable(tbl, deleteData || (envContext != null && "TRUE".equals(envContext.getProperties().get("ifPurge"))));
       }
       success=true;
     } catch (NoSuchObjectException e) {
@@ -1099,6 +1090,23 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
         hook.rollbackDropTable(tbl);
       }
     }
+  }
+
+  /**
+   * Truncate the table/partitions in the DEFAULT database.
+   * @param dbName
+   *          The db to which the table to be truncate belongs to
+   * @param tableName
+   *          The table to truncate
+   * @param partNames
+   *          List of partitions to truncate. NULL will truncate the whole table/all partitions
+   * @throws MetaException
+   * @throws TException
+   *           Could not truncate table properly.
+   */
+  @Override
+  public void truncateTable(String dbName, String tableName, List<String> partNames) throws MetaException, TException {
+    client.truncate_table(dbName, tableName, partNames);
   }
 
   /**
@@ -1332,7 +1340,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   @Override
   public Table getTable(String dbname, String name) throws MetaException,
       TException, NoSuchObjectException {
-    Table t = client.get_table(dbname, name);
+    GetTableRequest req = new GetTableRequest(dbname, name);
+    req.setCapabilities(version);
+    Table t = client.get_table_req(req).getTable();
     return fastpath ? t : deepCopy(filterHook.filterTable(t));
   }
 
@@ -1349,7 +1359,10 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   @Override
   public List<Table> getTableObjectsByName(String dbName, List<String> tableNames)
       throws MetaException, InvalidOperationException, UnknownDBException, TException {
-    List<Table> tabs = client.get_table_objects_by_name(dbName, tableNames);
+    GetTablesRequest req = new GetTablesRequest(dbName);
+    req.setTblNames(tableNames);
+    req.setCapabilities(version);
+    List<Table> tabs = client.get_table_objects_by_name_req(req).getTables();
     return fastpath ? tabs : deepCopyTables(filterHook.filterTables(tabs));
   }
 
@@ -1441,7 +1454,9 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   public boolean tableExists(String databaseName, String tableName) throws MetaException,
       TException, UnknownDBException {
     try {
-      return filterHook.filterTable(client.get_table(databaseName, tableName)) != null;
+      GetTableRequest req = new GetTableRequest(databaseName, tableName);
+      req.setCapabilities(version);
+      return filterHook.filterTable(client.get_table_req(req).getTable()) != null;
     } catch (NoSuchObjectException e) {
       return false;
     }
@@ -1482,6 +1497,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
    * @throws NoSuchObjectException
    * @throws TException
    */
+  @Override
   public int getNumPartitionsByFilter(String db_name, String tbl_name,
                                       String filter) throws MetaException,
           NoSuchObjectException, TException {
@@ -2182,9 +2198,15 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     cr.setType(type);
     client.compact(cr);
   }
-
+  @Deprecated
   @Override
   public void compact(String dbname, String tableName, String partitionName, CompactionType type,
+                      Map<String, String> tblproperties) throws TException {
+    compact2(dbname, tableName, partitionName, type, tblproperties);
+  }
+
+  @Override
+  public CompactionResponse compact2(String dbname, String tableName, String partitionName, CompactionType type,
                       Map<String, String> tblproperties) throws TException {
     CompactionRequest cr = new CompactionRequest();
     if (dbname == null) cr.setDbname(DEFAULT_DATABASE_NAME);
@@ -2193,9 +2215,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     if (partitionName != null) cr.setPartitionname(partitionName);
     cr.setType(type);
     cr.setProperties(tblproperties);
-    client.compact(cr);
+    return client.compact2(cr);
   }
-
   @Override
   public ShowCompactResponse showCompactions() throws TException {
     return client.show_compact(new ShowCompactRequest());
@@ -2206,13 +2227,32 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   public void addDynamicPartitions(long txnId, String dbName, String tableName,
                                    List<String> partNames) throws TException {
     client.add_dynamic_partitions(new AddDynamicPartitions(txnId, dbName, tableName, partNames));
-  }  
+  }
   @Override
   public void addDynamicPartitions(long txnId, String dbName, String tableName,
                                    List<String> partNames, DataOperationType operationType) throws TException {
     AddDynamicPartitions adp = new AddDynamicPartitions(txnId, dbName, tableName, partNames);
     adp.setOperationType(operationType);
     client.add_dynamic_partitions(adp);
+  }
+
+  @Override
+  public void insertTable(Table table, boolean overwrite) throws MetaException {
+    boolean failed = true;
+    HiveMetaHook hook = getHook(table);
+    if (hook == null || !(hook instanceof DefaultHiveMetaHook)) {
+      return;
+    }
+    DefaultHiveMetaHook hiveMetaHook = (DefaultHiveMetaHook) hook;
+    try {
+      hiveMetaHook.commitInsertTable(table, overwrite);
+      failed = false;
+    }
+    finally {
+      if (failed) {
+        hiveMetaHook.rollbackInsertTable(table, overwrite);
+      }
+    }
   }
 
   @InterfaceAudience.LimitedPrivate({"HCatalog"})

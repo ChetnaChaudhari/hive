@@ -1,6 +1,7 @@
 set hive.mapred.mode=nonstrict;
 set hive.explain.user=false;
 SET hive.vectorized.execution.enabled = true;
+set hive.cli.print.header=true;
 set hive.fetch.task.conversion=none;
 
 -- SORT_QUERY_RESULTS
@@ -26,6 +27,7 @@ INSERT INTO TABLE date_udf_flight_orc SELECT fl_date, to_utc_timestamp(fl_date, 
 SELECT * FROM date_udf_flight_orc;
 
 EXPLAIN VECTORIZATION EXPRESSION  SELECT
+  fl_time,
   to_unix_timestamp(fl_time),
   year(fl_time),
   month(fl_time),
@@ -37,10 +39,18 @@ EXPLAIN VECTORIZATION EXPRESSION  SELECT
   to_date(fl_time),
   date_add(fl_time, 2),
   date_sub(fl_time, 2),
-  datediff(fl_time, "2000-01-01")
+  datediff(fl_time, "2000-01-01"),
+  datediff(fl_time, date "2000-01-01"),
+  datediff(fl_time, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_time, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_time, "2007-03-14"),
+  datediff(fl_time, date "2007-03-14"),
+  datediff(fl_time, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_time, timestamp "2007-03-14 08:21:59")
 FROM date_udf_flight_orc;
 
 SELECT
+  fl_time,
   to_unix_timestamp(fl_time),
   year(fl_time),
   month(fl_time),
@@ -52,10 +62,18 @@ SELECT
   to_date(fl_time),
   date_add(fl_time, 2),
   date_sub(fl_time, 2),
-  datediff(fl_time, "2000-01-01")
+  datediff(fl_time, "2000-01-01"),
+  datediff(fl_time, date "2000-01-01"),
+  datediff(fl_time, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_time, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_time, "2007-03-14"),
+  datediff(fl_time, date "2007-03-14"),
+  datediff(fl_time, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_time, timestamp "2007-03-14 08:21:59")
 FROM date_udf_flight_orc;
 
 EXPLAIN VECTORIZATION EXPRESSION  SELECT
+  fl_date,
   to_unix_timestamp(fl_date),
   year(fl_date),
   month(fl_date),
@@ -67,10 +85,18 @@ EXPLAIN VECTORIZATION EXPRESSION  SELECT
   to_date(fl_date),
   date_add(fl_date, 2),
   date_sub(fl_date, 2),
-  datediff(fl_date, "2000-01-01")
+  datediff(fl_date, "2000-01-01"),
+  datediff(fl_date, date "2000-01-01"),
+  datediff(fl_date, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_date, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_date, "2007-03-14"),
+  datediff(fl_date, date "2007-03-14"),
+  datediff(fl_date, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_date, timestamp "2007-03-14 08:21:59")
 FROM date_udf_flight_orc;
 
 SELECT
+  fl_date,
   to_unix_timestamp(fl_date),
   year(fl_date),
   month(fl_date),
@@ -82,10 +108,19 @@ SELECT
   to_date(fl_date),
   date_add(fl_date, 2),
   date_sub(fl_date, 2),
-  datediff(fl_date, "2000-01-01")
+  datediff(fl_date, "2000-01-01"),
+  datediff(fl_date, date "2000-01-01"),
+  datediff(fl_date, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_date, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_date, "2007-03-14"),
+  datediff(fl_date, date "2007-03-14"),
+  datediff(fl_date, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_date, timestamp "2007-03-14 08:21:59")
 FROM date_udf_flight_orc;
 
 EXPLAIN VECTORIZATION EXPRESSION  SELECT
+  fl_time,
+  fl_date,
   year(fl_time) = year(fl_date),
   month(fl_time) = month(fl_date),
   day(fl_time) = day(fl_date),
@@ -96,11 +131,22 @@ EXPLAIN VECTORIZATION EXPRESSION  SELECT
   to_date(fl_time) = to_date(fl_date),
   date_add(fl_time, 2) = date_add(fl_date, 2),
   date_sub(fl_time, 2) = date_sub(fl_date, 2),
-  datediff(fl_time, "2000-01-01") = datediff(fl_date, "2000-01-01")
+  datediff(fl_time, "2000-01-01") = datediff(fl_date, "2000-01-01"),
+  datediff(fl_time, date "2000-01-01") = datediff(fl_date, date "2000-01-01"),
+  datediff(fl_time, timestamp "2000-01-01 00:00:00") = datediff(fl_date, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_time, timestamp "2000-01-01 11:13:09") = datediff(fl_date, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_time, "2007-03-14") = datediff(fl_date, "2007-03-14"),
+  datediff(fl_time, date "2007-03-14") = datediff(fl_date, date "2007-03-14"),
+  datediff(fl_time, timestamp "2007-03-14 00:00:00") = datediff(fl_date, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_time, timestamp "2007-03-14 08:21:59") = datediff(fl_date, timestamp "2007-03-14 08:21:59"),
+  datediff(fl_date, "2000-01-01") = datediff(fl_date, date "2000-01-01"),
+  datediff(fl_date, "2007-03-14") = datediff(fl_date, date "2007-03-14")
 FROM date_udf_flight_orc;
 
 -- Should all be true or NULL
 SELECT
+  fl_time,
+  fl_date,
   year(fl_time) = year(fl_date),
   month(fl_time) = month(fl_date),
   day(fl_time) = day(fl_date),
@@ -111,7 +157,16 @@ SELECT
   to_date(fl_time) = to_date(fl_date),
   date_add(fl_time, 2) = date_add(fl_date, 2),
   date_sub(fl_time, 2) = date_sub(fl_date, 2),
-  datediff(fl_time, "2000-01-01") = datediff(fl_date, "2000-01-01")
+  datediff(fl_time, "2000-01-01") = datediff(fl_date, "2000-01-01"),
+  datediff(fl_time, date "2000-01-01") = datediff(fl_date, date "2000-01-01"),
+  datediff(fl_time, timestamp "2000-01-01 00:00:00") = datediff(fl_date, timestamp "2000-01-01 00:00:00"),
+  datediff(fl_time, timestamp "2000-01-01 11:13:09") = datediff(fl_date, timestamp "2000-01-01 11:13:09"),
+  datediff(fl_time, "2007-03-14") = datediff(fl_date, "2007-03-14"),
+  datediff(fl_time, date "2007-03-14") = datediff(fl_date, date "2007-03-14"),
+  datediff(fl_time, timestamp "2007-03-14 00:00:00") = datediff(fl_date, timestamp "2007-03-14 00:00:00"),
+  datediff(fl_time, timestamp "2007-03-14 08:21:59") = datediff(fl_date, timestamp "2007-03-14 08:21:59"),
+  datediff(fl_date, "2000-01-01") = datediff(fl_date, date "2000-01-01"),
+  datediff(fl_date, "2007-03-14") = datediff(fl_date, date "2007-03-14")
 FROM date_udf_flight_orc;
 
 EXPLAIN VECTORIZATION EXPRESSION  SELECT 

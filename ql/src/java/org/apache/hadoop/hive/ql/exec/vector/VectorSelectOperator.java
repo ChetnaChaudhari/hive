@@ -48,7 +48,7 @@ public class VectorSelectOperator extends Operator<SelectDesc> implements
 
   private VectorSelectDesc vectorDesc;
 
-  protected VectorExpression[] vExpressions = null;
+  private VectorExpression[] vExpressions = null;
 
   private int [] projectedOutputColumns = null;
 

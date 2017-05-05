@@ -1,6 +1,4 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION 
+PREHOOK: query: EXPLAIN VECTORIZATION 
 SELECT   cfloat,
          cstring1,
          cint,
@@ -24,9 +22,7 @@ WHERE    (((cbigint > -23)
                   OR (cfloat = cdouble))))
 ORDER BY cbigint, cfloat
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-EXPLAIN VECTORIZATION 
+POSTHOOK: query: EXPLAIN VECTORIZATION 
 SELECT   cfloat,
          cstring1,
          cint,

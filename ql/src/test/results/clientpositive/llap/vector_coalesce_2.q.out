@@ -8,11 +8,9 @@ POSTHOOK: Output: database:default
 POSTHOOK: Output: default@str_str_orc
 PREHOOK: query: insert into table str_str_orc values (null, "X"), ("0", "X"), ("1", "X"), (null, "y")
 PREHOOK: type: QUERY
-PREHOOK: Input: default@values__tmp__table__1
 PREHOOK: Output: default@str_str_orc
 POSTHOOK: query: insert into table str_str_orc values (null, "X"), ("0", "X"), ("1", "X"), (null, "y")
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@values__tmp__table__1
 POSTHOOK: Output: default@str_str_orc
 POSTHOOK: Lineage: str_str_orc.str1 SIMPLE [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col1, type:string, comment:), ]
 POSTHOOK: Lineage: str_str_orc.str2 SIMPLE [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col2, type:string, comment:), ]
@@ -55,6 +53,10 @@ STAGE PLANS:
                     Statistics: Num rows: 4 Data size: 510 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       aggregations: sum(_col1)
+                      Group By Vectorization:
+                          vectorOutput: false
+                          native: false
+                          projectedOutputColumns: null
                       keys: _col0 (type: string)
                       mode: hash
                       outputColumnNames: _col0, _col1
@@ -72,6 +74,10 @@ STAGE PLANS:
             Reduce Operator Tree:
               Group By Operator
                 aggregations: sum(VALUE._col0)
+                Group By Vectorization:
+                    vectorOutput: false
+                    native: false
+                    projectedOutputColumns: null
                 keys: KEY._col0 (type: string)
                 mode: mergepartial
                 outputColumnNames: _col0, _col1
@@ -108,8 +114,8 @@ GROUP BY str2
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@str_str_orc
 #### A masked pattern was here ####
-X	0.02
 y	0.0
+X	0.02
 PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT COALESCE(str1, 0) as result
 from str_str_orc
@@ -213,7 +219,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [1, 4]
-                        selectExpressions: VectorUDFAdaptor(UDFToInteger(COALESCE(str1,0)))(children: VectorCoalesce(columns [0, 2])(children: col 0, ConstantVectorExpression(val 0) -> 2:string) -> 3:string) -> 4:Long
+                        selectExpressions: CastStringToLong(col 3)(children: VectorCoalesce(columns [0, 2])(children: col 0, ConstantVectorExpression(val 0) -> 2:string) -> 3:string) -> 4:int
                     Statistics: Num rows: 4 Data size: 510 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       aggregations: sum(_col1)
@@ -235,7 +241,7 @@ STAGE PLANS:
                         Reduce Sink Vectorization:
                             className: VectorReduceSinkStringOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 4 Data size: 510 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col1 (type: bigint)
             Execution mode: vectorized, llap
@@ -246,7 +252,7 @@ STAGE PLANS:
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
                 allNative: false
-                usesVectorUDFAdaptor: true
+                usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
             Execution mode: vectorized, llap
@@ -311,8 +317,8 @@ GROUP BY str2
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@str_str_orc
 #### A masked pattern was here ####
-X	0.02
 y	0.0
+X	0.02
 PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT COALESCE(str1, 0) as result
 from str_str_orc

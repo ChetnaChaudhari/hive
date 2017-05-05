@@ -136,7 +136,7 @@ public class IfExprStringScalarStringScalar extends VectorExpression {
 
   @Override
   public String vectorExpressionParameters() {
-    return "col " + arg1Column + ", val "+ new String(arg2Scalar, StandardCharsets.UTF_8) + ", val "+ new String(arg3Scalar, StandardCharsets.UTF_8);
+    return "col " + arg1Column + ", val "+ displayUtf8Bytes(arg2Scalar) + ", val "+ displayUtf8Bytes(arg3Scalar);
   }
 
   @Override

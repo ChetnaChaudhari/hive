@@ -152,7 +152,7 @@ public class StringScalarConcatStringGroupCol extends VectorExpression {
 
   @Override
   public String vectorExpressionParameters() {
-    return "val " + new String(value, StandardCharsets.UTF_8) + ", col " + colNum;
+    return "val " + displayUtf8Bytes(value) + ", col " + colNum;
   }
 
   @Override

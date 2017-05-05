@@ -1,22 +1,16 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-create table count_case_groupby (key string, bool boolean) STORED AS orc
+PREHOOK: query: create table count_case_groupby (key string, bool boolean) STORED AS orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@count_case_groupby
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-create table count_case_groupby (key string, bool boolean) STORED AS orc
+POSTHOOK: query: create table count_case_groupby (key string, bool boolean) STORED AS orc
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@count_case_groupby
 PREHOOK: query: insert into table count_case_groupby values ('key1', true),('key2', false),('key3', NULL),('key4', false),('key5',NULL)
 PREHOOK: type: QUERY
-PREHOOK: Input: default@values__tmp__table__1
 PREHOOK: Output: default@count_case_groupby
 POSTHOOK: query: insert into table count_case_groupby values ('key1', true),('key2', false),('key3', NULL),('key4', false),('key5',NULL)
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@values__tmp__table__1
 POSTHOOK: Output: default@count_case_groupby
 POSTHOOK: Lineage: count_case_groupby.bool EXPRESSION [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col2, type:string, comment:), ]
 POSTHOOK: Lineage: count_case_groupby.key SIMPLE [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col1, type:string, comment:), ]
@@ -57,7 +51,7 @@ STAGE PLANS:
                         className: VectorSelectOperator
                         native: true
                         projectedOutputColumns: [0, 3]
-                        selectExpressions: VectorUDFAdaptor(CASE WHEN (bool) THEN (1) WHEN ((not bool)) THEN (0) ELSE (null) END)(children: NotCol(col 1) -> 2:boolean) -> 3:Long
+                        selectExpressions: VectorUDFAdaptor(CASE WHEN (bool) THEN (1) WHEN ((not bool)) THEN (0) ELSE (null) END)(children: NotCol(col 1) -> 2:boolean) -> 3:int
                     Statistics: Num rows: 5 Data size: 452 Basic stats: COMPLETE Column stats: NONE
                     Group By Operator
                       aggregations: count(_col1)
@@ -79,7 +73,7 @@ STAGE PLANS:
                         Reduce Sink Vectorization:
                             className: VectorReduceSinkStringOperator
                             native: true
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, Uniform Hash IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 5 Data size: 452 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col1 (type: bigint)
             Execution mode: vectorized, llap

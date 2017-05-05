@@ -1,13 +1,4 @@
-PREHOOK: query: -- HIVE-13872
--- Looking for TableScan immediately followed by ReduceSink (no intervening SEL operator).
--- This caused problems for Vectorizer not eliminating columns which are not included.
--- The input file format didn't fill in those vectorized columns and thus caused NPE in
--- ReduceSink.
--- Only a problem when NOT CBO because of CBO rule-based transforms.
---
--- Using a cross-product.
-
-create table store_sales_txt
+PREHOOK: query: create table store_sales_txt
 (
     ss_sold_date_sk           int,
     ss_sold_time_sk           int,
@@ -38,16 +29,7 @@ stored as textfile
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@store_sales_txt
-POSTHOOK: query: -- HIVE-13872
--- Looking for TableScan immediately followed by ReduceSink (no intervening SEL operator).
--- This caused problems for Vectorizer not eliminating columns which are not included.
--- The input file format didn't fill in those vectorized columns and thus caused NPE in
--- ReduceSink.
--- Only a problem when NOT CBO because of CBO rule-based transforms.
---
--- Using a cross-product.
-
-create table store_sales_txt
+POSTHOOK: query: create table store_sales_txt
 (
     ss_sold_date_sk           int,
     ss_sold_time_sk           int,
@@ -235,8 +217,8 @@ STAGE PLANS:
               Map Join Vectorization:
                   className: VectorMapJoinOperator
                   native: false
-                  nativeConditionsMet: hive.vectorized.execution.mapjoin.native.enabled IS true, One MapJoin Condition IS true, No nullsafe IS true, Supports Key Types IS true, When Fast Hash Table, then requires no Hybrid Hash Join IS true, Small table vectorizes IS true
-                  nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false, Not empty key IS false
+                  nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                  nativeConditionsNotMet: hive.execution.engine mr IN [tez, spark] IS false
               outputColumnNames: _col0, _col2, _col16
               Statistics: Num rows: 200000 Data size: 92055200 Basic stats: COMPLETE Column stats: NONE
               Filter Operator
@@ -268,8 +250,8 @@ STAGE PLANS:
                       Reduce Sink Vectorization:
                           className: VectorReduceSinkOperator
                           native: false
-                          nativeConditionsMet: Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false, hive.execution.engine mr IN [tez, spark] IS false, Uniform Hash IS false
+                          nativeConditionsMet: No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
+                          nativeConditionsNotMet: hive.vectorized.execution.reducesink.new.enabled IS false, hive.execution.engine mr IN [tez, spark] IS false
                       Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col0 (type: bigint)
       Execution mode: vectorized
@@ -290,6 +272,10 @@ STAGE PLANS:
       Reduce Operator Tree:
         Group By Operator
           aggregations: count(VALUE._col0)
+          Group By Vectorization:
+              vectorOutput: false
+              native: false
+              projectedOutputColumns: null
           mode: mergepartial
           outputColumnNames: _col0
           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE

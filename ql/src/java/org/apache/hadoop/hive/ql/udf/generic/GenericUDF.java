@@ -43,9 +43,11 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.C
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveGrouping;
+import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hive.common.util.DateUtils;
@@ -364,6 +366,7 @@ public abstract class GenericUDF implements Closeable {
     case SHORT:
     case INT:
     case LONG:
+    case VOID:
       break;
     default:
       throw new UDFArgumentTypeException(i, getFuncName()
@@ -373,7 +376,7 @@ public abstract class GenericUDF implements Closeable {
 
     Converter converter = ObjectInspectorConverters.getConverter(
         arguments[i],
-        PrimitiveObjectInspectorFactory.writableIntObjectInspector);
+        PrimitiveObjectInspectorFactory.writableLongObjectInspector);
     converters[i] = converter;
     inputTypes[i] = inputType;
   }
@@ -528,6 +531,20 @@ public abstract class GenericUDF implements Closeable {
     Object constValue = ((ConstantObjectInspector) arguments[i]).getWritableConstantValue();
     String str = constValue == null ? null : constValue.toString();
     return str;
+  }
+
+  protected Boolean getConstantBooleanValue(ObjectInspector[] arguments, int i)
+      throws UDFArgumentTypeException {
+    Object constValue = ((ConstantObjectInspector) arguments[i]).getWritableConstantValue();
+    if (constValue == null) {
+      return false;
+    }
+    if (constValue instanceof BooleanWritable) {
+      return ((BooleanWritable) constValue).get();
+    } else {
+      throw new UDFArgumentTypeException(i, getFuncName() + " only takes BOOLEAN types as "
+          + getArgOrder(i) + " argument, got " + constValue.getClass());
+    }
   }
 
   protected Integer getConstantIntValue(ObjectInspector[] arguments, int i)

@@ -24,13 +24,16 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
@@ -88,6 +91,7 @@ public class TestJdbcWithMiniHS2 {
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
+    MiniHS2.cleanupLocalDir();
     HiveConf conf = new HiveConf();
     dataFileDir = conf.get("test.data.files").replace('\\', '/').replace("c:", "");
     kvDataFilePath = new Path(dataFileDir, "kv1.txt");
@@ -108,6 +112,14 @@ public class TestJdbcWithMiniHS2 {
     stmt.execute("drop database if exists " + testDbName + " cascade");
     stmt.execute("create database " + testDbName);
     stmt.close();
+
+    try {
+      openTestConnections();
+    } catch (Exception e) {
+      System.out.println("Unable to open default connections to MiniHS2: " + e);
+      throw e;
+    }
+
     // tables in test db
     createTestTables(conTestDb, testDbName);
   }
@@ -179,12 +191,13 @@ public class TestJdbcWithMiniHS2 {
     HiveConf conf = new HiveConf();
     startMiniHS2(conf);
     openDefaultConnections();
+    openTestConnections();
   }
 
   private static void startMiniHS2(HiveConf conf) throws Exception {
     conf.setBoolVar(ConfVars.HIVE_SUPPORT_CONCURRENCY, false);
     conf.setBoolVar(ConfVars.HIVE_SERVER2_LOGGING_OPERATION_ENABLED, false);
-    miniHS2 = new MiniHS2(conf);
+    miniHS2 = new MiniHS2.Builder().withConf(conf).cleanupLocalDirOnStartup(false).build();
     Map<String, String> confOverlay = new HashMap<String, String>();
     miniHS2.start(confOverlay);
   }
@@ -195,14 +208,18 @@ public class TestJdbcWithMiniHS2 {
     }
   }
 
-  private static void cleanupMiniHS2() {
+  private static void cleanupMiniHS2() throws IOException {
     if (miniHS2 != null) {
       miniHS2.cleanup();
     }
+    MiniHS2.cleanupLocalDir();
   }
 
   private static void openDefaultConnections() throws Exception {
     conDefault = getConnection();
+  }
+
+  private static void openTestConnections() throws Exception {
     conTestDb = getConnection(testDbName);
   }
 
@@ -961,6 +978,38 @@ public class TestJdbcWithMiniHS2 {
   }
 
   /**
+   * Test for jdbc driver retry on NoHttpResponseException
+   * @throws Exception
+   */
+  @Test
+  public void testHttpRetryOnServerIdleTimeout() throws Exception {
+    // Stop HiveServer2
+    stopMiniHS2();
+    HiveConf conf = new HiveConf();
+    conf.set("hive.server2.transport.mode", "http");
+    // Set server's idle timeout to a very low value
+    conf.set("hive.server2.thrift.http.max.idle.time", "5");
+    startMiniHS2(conf);
+    String userName = System.getProperty("user.name");
+    Connection conn = getConnection(miniHS2.getJdbcURL(testDbName), userName, "password");
+    Statement stmt = conn.createStatement();
+    stmt.execute("select from_unixtime(unix_timestamp())");
+    // Sleep for longer than server's idletimeout and execute a query
+    TimeUnit.SECONDS.sleep(10);
+    try {
+      stmt.execute("select from_unixtime(unix_timestamp())");
+    } catch (Exception e) {
+      fail("Not expecting exception: " + e);
+    } finally {
+      if (conn != null) {
+        conn.close();
+      }
+    }
+    // Restore original state
+    restoreMiniHS2AndConnections();
+  }
+
+  /**
    * Tests that DataNucleus' NucleusContext.classLoaderResolverMap clears cached class objects
    * (& hence doesn't leak classloaders) on closing any session
    *
@@ -1282,5 +1331,68 @@ public class TestJdbcWithMiniHS2 {
       assertEquals("Should not find 'not exist'", -1, strVal.toLowerCase().indexOf("not exist"));
     }
     assertTrue("Rows returned from describe function", numRows > 0);
+  }
+
+  @Test
+  public void testReplDumpResultSet() throws Exception {
+    String tid =
+        TestJdbcWithMiniHS2.class.getCanonicalName().toLowerCase().replace('.', '_') + "_"
+            + System.currentTimeMillis();
+    String testPathName = System.getProperty("test.warehouse.dir", "/tmp") + Path.SEPARATOR + tid;
+    Path testPath = new Path(testPathName);
+    FileSystem fs = testPath.getFileSystem(new HiveConf());
+    Statement stmt = conDefault.createStatement();
+    try {
+      stmt.execute("set hive.repl.rootdir = " + testPathName);
+      ResultSet rs = stmt.executeQuery("repl dump " + testDbName);
+      ResultSetMetaData rsMeta = rs.getMetaData();
+      assertEquals(2, rsMeta.getColumnCount());
+      int numRows = 0;
+      while (rs.next()) {
+        numRows++;
+        URI uri = new URI(rs.getString(1));
+        int notificationId = rs.getInt(2);
+        assertNotNull(uri);
+        assertEquals(testPath.toUri().getScheme(), uri.getScheme());
+        assertEquals(testPath.toUri().getAuthority(), uri.getAuthority());
+        // In test setup, we append '/next' to hive.repl.rootdir and use that as the dump location
+        assertEquals(testPath.toUri().getPath() + "/next", uri.getPath());
+        assertNotNull(notificationId);
+      }
+      assertEquals(1, numRows);
+    } finally {
+      // Clean up
+      fs.delete(testPath, true);
+    }
+  }
+
+  @Test
+  public void testFetchSize() throws Exception {
+    // Test setting fetch size below max
+    Connection fsConn = getConnection(miniHS2.getJdbcURL("default", "fetchSize=50", ""),
+      System.getProperty("user.name"), "bar");
+    Statement stmt = fsConn.createStatement();
+    stmt.execute("set hive.server2.thrift.resultset.serialize.in.tasks=true");
+    int fetchSize = stmt.getFetchSize();
+    assertEquals(50, fetchSize);
+    stmt.close();
+    fsConn.close();
+    // Test setting fetch size above max
+    fsConn = getConnection(
+      miniHS2.getJdbcURL(
+        "default",
+        "fetchSize=" + (miniHS2.getHiveConf().getIntVar(
+          HiveConf.ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_MAX_FETCH_SIZE) + 1),
+        ""),
+      System.getProperty("user.name"), "bar");
+    stmt = fsConn.createStatement();
+    stmt.execute("set hive.server2.thrift.resultset.serialize.in.tasks=true");
+    fetchSize = stmt.getFetchSize();
+    assertEquals(
+      miniHS2.getHiveConf().getIntVar(
+        HiveConf.ConfVars.HIVE_SERVER2_THRIFT_RESULTSET_MAX_FETCH_SIZE),
+      fetchSize);
+    stmt.close();
+    fsConn.close();
   }
 }

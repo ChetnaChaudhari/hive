@@ -77,7 +77,8 @@ public class Optimizer {
       Splitter.on(",").trimResults().omitEmptyStrings().split(
         Strings.nullToEmpty(HiveConf.getVar(hiveConf, HiveConf.ConfVars.POSTEXECHOOKS))));
     if (postExecHooks.contains("org.apache.hadoop.hive.ql.hooks.PostExecutePrinter")
-        || postExecHooks.contains("org.apache.hadoop.hive.ql.hooks.LineageLogger")) {
+        || postExecHooks.contains("org.apache.hadoop.hive.ql.hooks.LineageLogger")
+        || postExecHooks.contains("org.apache.atlas.hive.hook.HiveHook")) {
       transformations.add(new Generator());
     }
 
@@ -121,6 +122,8 @@ public class Optimizer {
         !HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTLISTBUCKETING)) {
       transformations.add(new SortedDynPartitionOptimizer());
     }
+
+    transformations.add(new SortedDynPartitionTimeGranularityOptimizer());
 
     if (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTPPD)) {
       transformations.add(new PartitionPruner());
@@ -207,7 +210,7 @@ public class Optimizer {
     if(HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEOPTCORRELATION) &&
         !HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEGROUPBYSKEW) &&
         !HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVE_OPTIMIZE_SKEWJOIN_COMPILETIME) &&
-        !isTezExecEngine) {
+        !isTezExecEngine && !isSparkExecEngine) {
       transformations.add(new CorrelationOptimizer());
     }
     if (HiveConf.getFloatVar(hiveConf, HiveConf.ConfVars.HIVELIMITPUSHDOWNMEMORYUSAGE) > 0) {
@@ -229,6 +232,10 @@ public class Optimizer {
       transformations.add(new SimpleFetchAggregation());
     }
 
+    if (pctx.getContext().getExplainConfig() != null
+        && pctx.getContext().getExplainConfig().isFormatted()) {
+      transformations.add(new AnnotateReduceSinkOutputOperator());
+    }
   }
 
   /**

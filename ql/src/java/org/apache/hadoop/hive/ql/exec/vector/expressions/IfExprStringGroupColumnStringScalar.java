@@ -167,7 +167,7 @@ public class IfExprStringGroupColumnStringScalar extends VectorExpression {
 
   @Override
   public String vectorExpressionParameters() {
-    return "col " + arg1Column + ", col "+ arg2Column + ", val "+ new String(arg3Scalar, StandardCharsets.UTF_8);
+    return "col " + arg1Column + ", col "+ arg2Column + ", val "+ displayUtf8Bytes(arg3Scalar);
   }
 
   @Override

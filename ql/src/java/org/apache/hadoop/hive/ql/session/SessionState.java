@@ -42,11 +42,8 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.google.common.collect.Maps;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -54,6 +51,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.log.ProgressMonitor;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.ObjectStore;
@@ -89,9 +87,12 @@ import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 
 /**
  * SessionState encapsulates common data associated with a session.
@@ -185,6 +186,7 @@ public class SessionState {
   private HiveAuthorizationProvider authorizer;
 
   private HiveAuthorizer authorizerV2;
+  private volatile ProgressMonitor progressMonitor;
 
   public enum AuthorizationMode{V1, V2};
 
@@ -280,6 +282,8 @@ public class SessionState {
   private final ResourceDownloader resourceDownloader;
 
   private List<String> forwardedAddresses;
+
+  private String atsDomainId;
 
   /**
    * Get the lineage state stored in this session.
@@ -455,6 +459,21 @@ public class SessionState {
     return txnMgr;
   }
 
+  /**
+   * This only for testing.  It allows to switch the manager before the (test) operation so that
+   * it's not coupled to the executing thread.  Since tests run against Derby which often wedges
+   * under concurrent access, tests must use a single thead and simulate concurrent access.
+   * For example, {@code TestDbTxnManager2}
+   */
+  @VisibleForTesting
+  public HiveTxnManager setTxnMgr(HiveTxnManager mgr) {
+    if(!(sessionConf.getBoolVar(ConfVars.HIVE_IN_TEST) || sessionConf.getBoolVar(ConfVars.HIVE_IN_TEZ_TEST))) {
+      throw new IllegalStateException("Only for testing!");
+    }
+    HiveTxnManager tmp = txnMgr;
+    txnMgr = mgr;
+    return tmp;
+  }
   public HadoopShims.HdfsEncryptionShim getHdfsEncryptionShim() throws HiveException {
     try {
       return getHdfsEncryptionShim(FileSystem.get(sessionConf));
@@ -1092,11 +1111,25 @@ public class SessionState {
       printInfo(info, null);
     }
 
+    public void printInfo(String info, boolean isSilent) {
+      printInfo(info, null, isSilent);
+    }
+
     public void printInfo(String info, String detail) {
-      if (!getIsSilent()) {
+      printInfo(info, detail, getIsSilent());
+    }
+
+    public void printInfo(String info, String detail, boolean isSilent) {
+      if (!isSilent) {
         getInfoStream().println(info);
       }
       LOG.info(info + StringUtils.defaultString(detail));
+    }
+
+    public void printInfoNoLog(String info) {
+      if (!getIsSilent()) {
+        getInfoStream().println(info);
+      }
     }
 
     public void printError(String error) {
@@ -1233,6 +1266,14 @@ public class SessionState {
               + org.apache.hadoop.util.StringUtils.stringifyException(e));
       return false;
     }
+  }
+
+  public String getATSDomainId() {
+    return atsDomainId;
+  }
+
+  public void setATSDomainId(String domainId) {
+    this.atsDomainId = domainId;
   }
 
   /**
@@ -1558,6 +1599,7 @@ public class SessionState {
       // removes the threadlocal variables, closes underlying HMS connection
       Hive.closeCurrent();
     }
+    progressMonitor = null;
   }
 
   private void unCacheDataNucleusClassLoaders() {
@@ -1738,6 +1780,49 @@ public class SessionState {
   public String getReloadableAuxJars() {
     return StringUtils.join(preReloadableAuxJars, ',');
   }
+
+  public void updateProgressedPercentage(final double percentage) {
+    this.progressMonitor = new ProgressMonitor() {
+      @Override
+      public List<String> headers() {
+        return null;
+      }
+
+      @Override
+      public List<List<String>> rows() {
+        return null;
+      }
+
+      @Override
+      public String footerSummary() {
+        return null;
+      }
+
+      @Override
+      public long startTime() {
+        return 0;
+      }
+
+      @Override
+      public String executionStatus() {
+        return null;
+      }
+
+      @Override
+      public double progressedPercentage() {
+        return percentage;
+      }
+    };
+  }
+
+  public void updateProgressMonitor(ProgressMonitor progressMonitor) {
+    this.progressMonitor = progressMonitor;
+  }
+
+  public ProgressMonitor getProgressMonitor() {
+    return progressMonitor;
+  }
+
 }
 
 class ResourceMaps {

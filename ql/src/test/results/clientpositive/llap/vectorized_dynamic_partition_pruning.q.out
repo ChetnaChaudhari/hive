@@ -76,12 +76,16 @@ STAGE PLANS:
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 2 Data size: 368 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: vectorized, llap
             Reduce Vectorization:
@@ -213,11 +217,9 @@ POSTHOOK: Output: database:default
 POSTHOOK: Output: default@srcpart_double_hour
 POSTHOOK: Lineage: srcpart_double_hour.hour SIMPLE [(srcpart)srcpart.FieldSchema(name:hr, type:string, comment:null), ]
 POSTHOOK: Lineage: srcpart_double_hour.hr EXPRESSION [(srcpart)srcpart.FieldSchema(name:hr, type:string, comment:null), ]
-PREHOOK: query: -- single column, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- single column, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -233,7 +235,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -251,12 +253,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -385,7 +391,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -403,12 +409,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -517,12 +527,10 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
 1000
-PREHOOK: query: -- multiple sources, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- multiple sources, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -540,7 +548,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 5 (SIMPLE_EDGE)
         Reducer 3 <- Map 6 (SIMPLE_EDGE), Reducer 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -558,12 +566,16 @@ STAGE PLANS:
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col1 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 5 
             Map Operator Tree:
                 TableScan
@@ -758,7 +770,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 5 (SIMPLE_EDGE)
         Reducer 3 <- Map 6 (SIMPLE_EDGE), Reducer 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -777,12 +789,16 @@ STAGE PLANS:
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col1 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 5 
             Map Operator Tree:
                 TableScan
@@ -937,11 +953,9 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 #### A masked pattern was here ####
 500
-PREHOOK: query: -- multiple columns single source
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- multiple columns single source
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -957,7 +971,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -974,12 +988,16 @@ STAGE PLANS:
                       sort order: ++
                       Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1123,7 +1141,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1141,12 +1159,16 @@ STAGE PLANS:
                       sort order: ++
                       Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1253,11 +1275,9 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 #### A masked pattern was here ####
 500
-PREHOOK: query: -- empty set
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- empty set
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -1273,7 +1293,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1291,12 +1311,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1425,7 +1449,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1443,12 +1467,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1553,11 +1581,9 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@srcpart
 #### A masked pattern was here ####
 0
-PREHOOK: query: -- expressions
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- expressions
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -1573,7 +1599,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1591,12 +1617,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: UDFToDouble(_col0) (type: double)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1725,7 +1755,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1743,12 +1773,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: (UDFToDouble(_col0) * 2.0) (type: double)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -1877,7 +1911,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1895,12 +1929,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: UDFToDouble(_col0) (type: double)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2014,7 +2052,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2032,12 +2070,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: (UDFToDouble(_col0) * 2.0) (type: double)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2164,7 +2206,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2182,12 +2224,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: UDFToString((UDFToDouble(_col0) * 2.0)) (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2312,11 +2358,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
 #### A masked pattern was here ####
 1000
 Warning: Shuffle Join MERGEJOIN[22][tables = [$hdt$_0, $hdt$_1]] in Stage 'Reducer 2' is a cross product
-PREHOOK: query: -- parent is reduce tasks
-EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- parent is reduce tasks
-EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -2331,8 +2375,8 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 5 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE), Reducer 5 (CUSTOM_SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
         Reducer 5 <- Map 4 (SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
@@ -2347,12 +2391,16 @@ STAGE PLANS:
                     Reduce Output Operator
                       sort order: 
                       Statistics: Num rows: 1000 Data size: 94000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2371,12 +2419,16 @@ STAGE PLANS:
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 94 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: llap
             Reduce Operator Tree:
@@ -2473,11 +2525,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
 1000
 Warning: Shuffle Join MERGEJOIN[16][tables = [$hdt$_0, $hdt$_1]] in Stage 'Reducer 2' is a cross product
-PREHOOK: query: -- non-equi join
-EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where (srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11) and (srcpart.ds = srcpart_date_hour.ds or srcpart.hr = srcpart_date_hour.hr)
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where (srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11) and (srcpart.ds = srcpart_date_hour.ds or srcpart.hr = srcpart_date_hour.hr)
 PREHOOK: type: QUERY
-POSTHOOK: query: -- non-equi join
-EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where (srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11) and (srcpart.ds = srcpart_date_hour.ds or srcpart.hr = srcpart_date_hour.hr)
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where (srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11) and (srcpart.ds = srcpart_date_hour.ds or srcpart.hr = srcpart_date_hour.hr)
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -2492,8 +2542,8 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE), Map 4 (CUSTOM_SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2509,12 +2559,16 @@ STAGE PLANS:
                       sort order: 
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col0 (type: string), _col1 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2539,7 +2593,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: true
                 vectorized: true
         Reducer 2 
@@ -2616,11 +2670,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
 POSTHOOK: Input: default@srcpart_date_hour
 #### A masked pattern was here ####
 1500
-PREHOOK: query: -- old style join syntax
-EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11 and srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11 and srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr
 PREHOOK: type: QUERY
-POSTHOOK: query: -- old style join syntax
-EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11 and srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart, srcpart_date_hour where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11 and srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -2636,7 +2688,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2653,12 +2705,16 @@ STAGE PLANS:
                       sort order: ++
                       Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                       Statistics: Num rows: 2000 Data size: 736000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2784,11 +2840,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
 POSTHOOK: Input: default@srcpart_date_hour
 #### A masked pattern was here ####
 500
-PREHOOK: query: -- left join
-EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- left join
-EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -2804,7 +2858,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2822,12 +2876,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -2937,7 +2995,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -2997,12 +3055,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: llap
             Reduce Operator Tree:
@@ -3051,11 +3113,9 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- full outer
-EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- full outer
-EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -3071,7 +3131,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 4 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -3088,12 +3148,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -3185,12 +3249,10 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- with static pruning
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11 and srcpart.hr = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- with static pruning
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11 and srcpart.hr = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -3208,7 +3270,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 5 (SIMPLE_EDGE)
         Reducer 3 <- Map 6 (SIMPLE_EDGE), Reducer 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -3226,12 +3288,16 @@ STAGE PLANS:
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
                       value expressions: _col1 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 5 
             Map Operator Tree:
                 TableScan
@@ -3293,6 +3359,21 @@ STAGE PLANS:
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                      Select Operator
+                        expressions: _col0 (type: string)
+                        outputColumnNames: _col0
+                        Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                        Group By Operator
+                          keys: _col0 (type: string)
+                          mode: hash
+                          outputColumnNames: _col0
+                          Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                          Dynamic Partitioning Event Operator
+                            Target column: hr (string)
+                            Target Input: srcpart
+                            Partition key expr: hr
+                            Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                            Target Vertex: Map 1
             Execution mode: vectorized, llap
             LLAP IO: all inputs
             Map Vectorization:
@@ -3300,7 +3381,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: true
+                allNative: false
                 usesVectorUDFAdaptor: true
                 vectorized: true
         Reducer 2 
@@ -3407,7 +3488,7 @@ STAGE PLANS:
       Edges:
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Map 5 (SIMPLE_EDGE)
         Reducer 3 <- Map 6 (SIMPLE_EDGE), Reducer 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -3572,11 +3653,9 @@ POSTHOOK: Input: default@srcpart_date
 POSTHOOK: Input: default@srcpart_hour
 #### A masked pattern was here ####
 0
-PREHOOK: query: -- union + subquery
-EXPLAIN VECTORIZATION select count(*) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
 PREHOOK: type: QUERY
-POSTHOOK: query: -- union + subquery
-EXPLAIN VECTORIZATION select count(*) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -3591,10 +3670,11 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE), Union 6 (SIMPLE_EDGE)
-        Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
-        Reducer 5 <- Map 4 (SIMPLE_EDGE), Union 6 (CONTAINS)
-        Reducer 8 <- Map 7 (SIMPLE_EDGE), Union 6 (CONTAINS)
+        Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 7 (SIMPLE_EDGE)
+        Reducer 3 <- Reducer 2 (CUSTOM_SIMPLE_EDGE)
+        Reducer 5 <- Map 4 (CUSTOM_SIMPLE_EDGE), Union 6 (CONTAINS)
+        Reducer 7 <- Union 6 (SIMPLE_EDGE)
+        Reducer 9 <- Map 8 (CUSTOM_SIMPLE_EDGE), Union 6 (CONTAINS)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -3612,12 +3692,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -3636,13 +3720,17 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
-        Map 7 
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+        Map 8 
             Map Operator Tree:
                 TableScan
                   alias: srcpart
@@ -3660,18 +3748,22 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: llap
             Reduce Operator Tree:
               Merge Join Operator
                 condition map:
-                     Left Semi Join 0 to 1
+                     Inner Join 0 to 1
                 keys:
                   0 _col0 (type: string)
                   1 _col0 (type: string)
@@ -3735,22 +3827,42 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
+        Reducer 7 
+            Execution mode: vectorized, llap
+            Reduce Vectorization:
+                enabled: true
+                enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+            Reduce Operator Tree:
+              Group By Operator
+                keys: KEY._col0 (type: string)
+                mode: mergepartial
+                outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                Select Operator
+                  expressions: _col0 (type: string)
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                  Group By Operator
+                    keys: _col0 (type: string)
+                    mode: hash
+                    outputColumnNames: _col0
+                    Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                    Dynamic Partitioning Event Operator
+                      Target column: ds (string)
+                      Target Input: srcpart
+                      Partition key expr: ds
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
-        Reducer 8 
+                      Target Vertex: Map 1
+        Reducer 9 
             Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
@@ -3778,21 +3890,6 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
-                      Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
         Union 6 
             Vertex: Union 6
 
@@ -3836,10 +3933,11 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE), Union 6 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (SIMPLE_EDGE), Reducer 7 (SIMPLE_EDGE)
         Reducer 3 <- Reducer 2 (SIMPLE_EDGE)
-        Reducer 5 <- Map 4 (SIMPLE_EDGE), Union 6 (CONTAINS)
-        Reducer 8 <- Map 7 (SIMPLE_EDGE), Union 6 (CONTAINS)
+        Reducer 5 <- Map 4 (CUSTOM_SIMPLE_EDGE), Union 6 (CONTAINS)
+        Reducer 7 <- Union 6 (SIMPLE_EDGE)
+        Reducer 9 <- Map 8 (CUSTOM_SIMPLE_EDGE), Union 6 (CONTAINS)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -3857,12 +3955,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 4 
             Map Operator Tree:
                 TableScan
@@ -3881,13 +3983,17 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
-        Map 7 
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+        Map 8 
             Map Operator Tree:
                 TableScan
                   alias: srcpart
@@ -3905,18 +4011,22 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: llap
             Reduce Operator Tree:
               Merge Join Operator
                 condition map:
-                     Left Semi Join 0 to 1
+                     Inner Join 0 to 1
                 keys:
                   0 _col0 (type: string)
                   1 _col0 (type: string)
@@ -3982,22 +4092,42 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
+        Reducer 7 
+            Execution mode: vectorized, llap
+            Reduce Vectorization:
+                enabled: true
+                enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+            Reduce Operator Tree:
+              Group By Operator
+                keys: KEY._col0 (type: string)
+                mode: mergepartial
+                outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                Select Operator
+                  expressions: _col0 (type: string)
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                  Group By Operator
+                    keys: _col0 (type: string)
+                    mode: hash
+                    outputColumnNames: _col0
+                    Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                    Dynamic Partitioning Event Operator
+                      Target column: ds (string)
+                      Target Input: srcpart
+                      Partition key expr: ds
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
-        Reducer 8 
+                      Target Vertex: Map 1
+        Reducer 9 
             Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
@@ -4025,21 +4155,6 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
-                      Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
         Union 6 
             Vertex: Union 6
 
@@ -4084,11 +4199,11 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 11 <- Map 10 (SIMPLE_EDGE), Union 9 (CONTAINS)
+        Reducer 11 <- Map 10 (CUSTOM_SIMPLE_EDGE), Union 9 (CONTAINS)
         Reducer 2 <- Map 1 (SIMPLE_EDGE), Union 3 (CONTAINS)
         Reducer 4 <- Union 3 (SIMPLE_EDGE), Union 9 (SIMPLE_EDGE)
         Reducer 6 <- Map 5 (SIMPLE_EDGE), Union 3 (CONTAINS)
-        Reducer 8 <- Map 7 (SIMPLE_EDGE), Union 9 (CONTAINS)
+        Reducer 8 <- Map 7 (CUSTOM_SIMPLE_EDGE), Union 9 (CONTAINS)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -4107,12 +4222,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2 Data size: 368 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 10 
             Map Operator Tree:
                 TableScan
@@ -4131,12 +4250,16 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 5 
             Map Operator Tree:
                 TableScan
@@ -4153,12 +4276,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2 Data size: 368 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 7 
             Map Operator Tree:
                 TableScan
@@ -4177,12 +4304,16 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 11 
             Execution mode: vectorized, llap
             Reduce Vectorization:
@@ -4388,11 +4519,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
 2008-04-08
 2008-04-09
 2008-04-09
-PREHOOK: query: -- single column, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- single column, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -4408,7 +4537,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -4439,12 +4568,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -4549,12 +4682,10 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
 1000
-PREHOOK: query: -- multiple sources, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- multiple sources, single key
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -4571,7 +4702,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE), Map 4 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -4611,12 +4742,16 @@ STAGE PLANS:
                             sort order: 
                             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -4766,11 +4901,9 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 #### A masked pattern was here ####
 500
-PREHOOK: query: -- multiple columns single source
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- multiple columns single source
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date_hour on (srcpart.ds = srcpart_date_hour.ds and srcpart.hr = srcpart_date_hour.hr) where srcpart_date_hour.`date` = '2008-04-08' and srcpart_date_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -4786,7 +4919,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -4816,12 +4949,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -4939,11 +5076,9 @@ POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 #### A masked pattern was here ####
 500
-PREHOOK: query: -- empty set
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- empty set
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = 'I DONT EXIST'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -4959,7 +5094,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -4990,12 +5125,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -5087,11 +5226,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
 POSTHOOK: Input: default@srcpart_date
 #### A masked pattern was here ####
 0
-PREHOOK: query: -- expressions
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- expressions
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_double_hour on (srcpart.hr = cast(srcpart_double_hour.hr/2 as int)) where srcpart_double_hour.hour = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -5107,7 +5244,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5138,12 +5275,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -5253,7 +5394,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5284,12 +5425,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -5395,13 +5540,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
 #### A masked pattern was here ####
 1000
 Warning: Map Join MAPJOIN[22][bigTable=?] in task 'Reducer 3' is a cross product
-PREHOOK: query: -- parent is reduce tasks
-
-EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- parent is reduce tasks
-
-EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join (select ds as ds, ds as `date` from srcpart group by ds) s on (srcpart.ds = s.ds) where s.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -5417,7 +5558,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Reducer 3 <- Map 1 (BROADCAST_EDGE), Map 2 (SIMPLE_EDGE)
-        Reducer 4 <- Reducer 3 (SIMPLE_EDGE)
+        Reducer 4 <- Reducer 3 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5431,12 +5572,16 @@ STAGE PLANS:
                     Reduce Output Operator
                       sort order: 
                       Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 2 
             Map Operator Tree:
                 TableScan
@@ -5455,12 +5600,16 @@ STAGE PLANS:
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 3 
             Execution mode: vectorized, llap
             Reduce Vectorization:
@@ -5552,11 +5701,9 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 #### A masked pattern was here ####
 1000
-PREHOOK: query: -- left join
-EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- left join
-EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart left join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -5572,7 +5719,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5603,12 +5750,16 @@ STAGE PLANS:
                           sort order: 
                           Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                           value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -5699,7 +5850,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5757,12 +5908,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Reducer 2 
             Execution mode: vectorized, llap
             Reduce Vectorization:
@@ -5792,11 +5947,9 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- full outer
-EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 PREHOOK: type: QUERY
-POSTHOOK: query: -- full outer
-EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart full outer join srcpart_date on (srcpart.ds = srcpart_date.ds) where srcpart_date.`date` = '2008-04-08'
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -5812,7 +5965,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 2 <- Map 1 (BROADCAST_EDGE)
-        Reducer 3 <- Map 2 (SIMPLE_EDGE)
+        Reducer 3 <- Map 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5829,12 +5982,16 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 2 
             Map Operator Tree:
                 TableScan
@@ -5905,12 +6062,10 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- with static pruning
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+PREHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11 and srcpart.hr = 11
 PREHOOK: type: QUERY
-POSTHOOK: query: -- with static pruning
-EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
+POSTHOOK: query: EXPLAIN VECTORIZATION select count(*) from srcpart join srcpart_date on (srcpart.ds = srcpart_date.ds) join srcpart_hour on (srcpart.hr = srcpart_hour.hr) 
 where srcpart_date.`date` = '2008-04-08' and srcpart_hour.hour = 11 and srcpart.hr = 11
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
@@ -5927,7 +6082,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE), Map 4 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -5967,12 +6122,16 @@ STAGE PLANS:
                             sort order: 
                             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                             value expressions: _col0 (type: bigint)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
         Map 3 
             Map Operator Tree:
                 TableScan
@@ -6034,6 +6193,21 @@ STAGE PLANS:
                         sort order: +
                         Map-reduce partition columns: _col0 (type: string)
                         Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                      Select Operator
+                        expressions: _col0 (type: string)
+                        outputColumnNames: _col0
+                        Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                        Group By Operator
+                          keys: _col0 (type: string)
+                          mode: hash
+                          outputColumnNames: _col0
+                          Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                          Dynamic Partitioning Event Operator
+                            Target column: hr (string)
+                            Target Input: srcpart
+                            Partition key expr: hr
+                            Statistics: Num rows: 1 Data size: 172 Basic stats: COMPLETE Column stats: NONE
+                            Target Vertex: Map 1
             Execution mode: vectorized, llap
             LLAP IO: all inputs
             Map Vectorization:
@@ -6041,7 +6215,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: true
+                allNative: false
                 usesVectorUDFAdaptor: true
                 vectorized: true
         Reducer 2 
@@ -6112,7 +6286,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 2 <- Map 1 (BROADCAST_EDGE), Map 4 (BROADCAST_EDGE)
-        Reducer 3 <- Map 2 (SIMPLE_EDGE)
+        Reducer 3 <- Map 2 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -6265,11 +6439,9 @@ POSTHOOK: Input: default@srcpart_date
 POSTHOOK: Input: default@srcpart_hour
 #### A masked pattern was here ####
 0
-PREHOOK: query: -- union + subquery
-EXPLAIN VECTORIZATION select distinct(ds) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
+PREHOOK: query: EXPLAIN VECTORIZATION select distinct(ds) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
 PREHOOK: type: QUERY
-POSTHOOK: query: -- union + subquery
-EXPLAIN VECTORIZATION select distinct(ds) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
+POSTHOOK: query: EXPLAIN VECTORIZATION select distinct(ds) from srcpart where srcpart.ds in (select max(srcpart.ds) from srcpart union all select min(srcpart.ds) from srcpart)
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -6284,10 +6456,10 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Map 1 <- Union 5 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
-        Reducer 4 <- Map 3 (SIMPLE_EDGE), Union 5 (CONTAINS)
-        Reducer 7 <- Map 6 (SIMPLE_EDGE), Union 5 (CONTAINS)
+        Reducer 3 <- Map 2 (CUSTOM_SIMPLE_EDGE), Union 4 (CONTAINS)
+        Reducer 5 <- Map 1 (BROADCAST_EDGE), Union 4 (SIMPLE_EDGE)
+        Reducer 6 <- Reducer 5 (SIMPLE_EDGE)
+        Reducer 8 <- Map 7 (CUSTOM_SIMPLE_EDGE), Union 4 (CONTAINS)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -6300,33 +6472,22 @@ STAGE PLANS:
                     expressions: ds (type: string)
                     outputColumnNames: _col0
                     Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
-                    Map Join Operator
-                      condition map:
-                           Left Semi Join 0 to 1
-                      keys:
-                        0 _col0 (type: string)
-                        1 _col0 (type: string)
-                      outputColumnNames: _col0
-                      input vertices:
-                        1 Union 5
-                      Statistics: Num rows: 1000 Data size: 184000 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Reduce Output Operator
-                          key expressions: _col0 (type: string)
-                          sort order: +
-                          Map-reduce partition columns: _col0 (type: string)
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-            Execution mode: llap
+                    Reduce Output Operator
+                      key expressions: _col0 (type: string)
+                      sort order: +
+                      Map-reduce partition columns: _col0 (type: string)
+                      Statistics: Num rows: 2000 Data size: 368000 Basic stats: COMPLETE Column stats: COMPLETE
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
-        Map 3 
+                allNative: true
+                usesVectorUDFAdaptor: false
+                vectorized: true
+        Map 2 
             Map Operator Tree:
                 TableScan
                   alias: srcpart
@@ -6344,13 +6505,17 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
+                enabled: true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
+                groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
-        Map 6 
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+        Map 7 
             Map Operator Tree:
                 TableScan
                   alias: srcpart
@@ -6368,35 +6533,17 @@ STAGE PLANS:
                         sort order: 
                         Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
                         value expressions: _col0 (type: string)
-            Execution mode: llap
+            Execution mode: vectorized, llap
             LLAP IO: no inputs
             Map Vectorization:
-                enabled: false
-                enabledConditionsNotMet: hive.vectorized.use.vector.serde.deserialize IS false
-                inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
-        Reducer 2 
-            Execution mode: vectorized, llap
-            Reduce Vectorization:
                 enabled: true
-                enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                enabledConditionsMet: hive.vectorized.use.vector.serde.deserialize IS true
                 groupByVectorOutput: true
+                inputFileFormats: org.apache.hadoop.mapred.TextInputFormat
                 allNative: false
                 usesVectorUDFAdaptor: false
                 vectorized: true
-            Reduce Operator Tree:
-              Group By Operator
-                keys: KEY._col0 (type: string)
-                mode: mergepartial
-                outputColumnNames: _col0
-                Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                File Output Operator
-                  compressed: false
-                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-        Reducer 4 
+        Reducer 3 
             Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
@@ -6424,22 +6571,64 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
+        Reducer 5 
+            Execution mode: vectorized, llap
+            Reduce Vectorization:
+                enabled: true
+                enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+            Reduce Operator Tree:
+              Group By Operator
+                keys: KEY._col0 (type: string)
+                mode: mergepartial
+                outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                Map Join Operator
+                  condition map:
+                       Inner Join 0 to 1
+                  keys:
+                    0 _col0 (type: string)
+                    1 _col0 (type: string)
+                  outputColumnNames: _col0
+                  input vertices:
+                    0 Map 1
+                  Statistics: Num rows: 1000 Data size: 184000 Basic stats: COMPLETE Column stats: COMPLETE
+                  Group By Operator
+                    keys: _col0 (type: string)
+                    mode: hash
+                    outputColumnNames: _col0
+                    Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                    Reduce Output Operator
+                      key expressions: _col0 (type: string)
+                      sort order: +
+                      Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
-        Reducer 7 
+        Reducer 6 
+            Execution mode: vectorized, llap
+            Reduce Vectorization:
+                enabled: true
+                enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+            Reduce Operator Tree:
+              Group By Operator
+                keys: KEY._col0 (type: string)
+                mode: mergepartial
+                outputColumnNames: _col0
+                Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
+                  table:
+                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+        Reducer 8 
             Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
@@ -6467,23 +6656,8 @@ STAGE PLANS:
                       sort order: +
                       Map-reduce partition columns: _col0 (type: string)
                       Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                    Select Operator
-                      expressions: _col0 (type: string)
-                      outputColumnNames: _col0
-                      Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                      Group By Operator
-                        keys: _col0 (type: string)
-                        mode: hash
-                        outputColumnNames: _col0
-                        Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                        Dynamic Partitioning Event Operator
-                          Target column: ds (string)
-                          Target Input: srcpart
-                          Partition key expr: ds
-                          Statistics: Num rows: 1 Data size: 184 Basic stats: COMPLETE Column stats: COMPLETE
-                          Target Vertex: Map 1
-        Union 5 
-            Vertex: Union 5
+        Union 4 
+            Vertex: Union 4
 
   Stage: Stage-0
     Fetch Operator
@@ -6509,13 +6683,11 @@ POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
 #### A masked pattern was here ####
 2008-04-08
 2008-04-09
-PREHOOK: query: -- different file format
-create table srcpart_orc (key int, value string) partitioned by (ds string, hr int) stored as orc
+PREHOOK: query: create table srcpart_orc (key int, value string) partitioned by (ds string, hr int) stored as orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@srcpart_orc
-POSTHOOK: query: -- different file format
-create table srcpart_orc (key int, value string) partitioned by (ds string, hr int) stored as orc
+POSTHOOK: query: create table srcpart_orc (key int, value string) partitioned by (ds string, hr int) stored as orc
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@srcpart_orc
@@ -6564,7 +6736,7 @@ STAGE PLANS:
 #### A masked pattern was here ####
       Edges:
         Map 1 <- Map 3 (BROADCAST_EDGE)
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 

@@ -151,7 +151,6 @@ enum EventRequestType {
     DELETE = 3,
 }
 
-
 struct HiveObjectRef{
   1: HiveObjectType objectType,
   2: string dbName,
@@ -303,9 +302,10 @@ struct Table {
   9: map<string, string> parameters,   // to store comments or any other user level parameters
   10: string viewOriginalText,         // original view text, null for non-view
   11: string viewExpandedText,         // expanded view text, null for non-view
-  12: string tableType,                 // table type enum, e.g. EXTERNAL_TABLE
+  12: string tableType,                // table type enum, e.g. EXTERNAL_TABLE
   13: optional PrincipalPrivilegeSet privileges,
-  14: optional bool temporary=false
+  14: optional bool temporary=false,
+  15: optional bool rewriteEnabled     // rewrite enabled or not
 }
 
 struct Partition {
@@ -625,6 +625,8 @@ struct TxnInfo {
     5: optional string agentInfo = "Unknown",
     6: optional i32 heartbeatCount=0,
     7: optional string metaInfo,
+    8: optional i64 startedTime,
+    9: optional i64 lastHeartbeatTime,
 }
 
 struct GetOpenTxnsInfoResponse {
@@ -634,8 +636,9 @@ struct GetOpenTxnsInfoResponse {
 
 struct GetOpenTxnsResponse {
     1: required i64 txn_high_water_mark,
-    2: required set<i64> open_txns,
+    2: required list<i64> open_txns,  // set<i64> changed to list<i64> since 3.0
     3: optional i64 min_open_txn, //since 1.3,2.2
+    4: required binary abortedBits,   // since 3.0
 }
 
 struct OpenTxnRequest {
@@ -668,7 +671,8 @@ struct LockComponent {
     4: optional string tablename,
     5: optional string partitionname,
     6: optional DataOperationType operationType = DataOperationType.UNSET,
-    7: optional bool isAcid = false
+    7: optional bool isAcid = false,
+    8: optional bool isDynamicPartitionWrite = false
 }
 
 struct LockRequest {
@@ -748,6 +752,12 @@ struct CompactionRequest {
     6: optional map<string, string> properties
 }
 
+struct CompactionResponse {
+    1: required i64 id,
+    2: required string state,
+    3: required bool accepted
+}
+
 struct ShowCompactRequest {
 }
 
@@ -764,6 +774,7 @@ struct ShowCompactResponseElement {
     10: optional string metaInfo,
     11: optional i64 endTime,
     12: optional string hadoopJobId = "None",
+    13: optional i64 id,
 }
 
 struct ShowCompactResponse {
@@ -790,6 +801,7 @@ struct NotificationEvent {
     4: optional string dbName,
     5: optional string tableName,
     6: required string message,
+    7: optional string messageFormat,
 }
 
 struct NotificationEventResponse {
@@ -801,7 +813,10 @@ struct CurrentNotificationEventId {
 }
 
 struct InsertEventRequestData {
-    1: required list<string> filesAdded
+    1: optional bool replace,
+    2: required list<string> filesAdded,
+    // Checksum of files (hex string of checksum byte payload)
+    3: optional list<string> filesAddedChecksum,
 }
 
 union FireEventRequestData {
@@ -892,6 +907,35 @@ struct CacheFileMetadataRequest {
 
 struct GetAllFunctionsResponse {
   1: optional list<Function> functions
+}
+
+enum ClientCapability {
+  TEST_CAPABILITY = 1
+}
+
+
+struct ClientCapabilities {
+  1: required list<ClientCapability> values
+}
+
+struct GetTableRequest {
+  1: required string dbName,
+  2: required string tblName,
+  3: optional ClientCapabilities capabilities
+}
+
+struct GetTableResult {
+  1: required Table table
+}
+
+struct GetTablesRequest {
+  1: required string dbName,
+  2: optional list<string> tblNames,
+  3: optional ClientCapabilities capabilities
+}
+
+struct GetTablesResult {
+  1: required list<Table> tables
 }
 
 struct TableMeta {
@@ -1029,6 +1073,8 @@ service ThriftHiveMetastore extends fb303.FacebookService
   void drop_table_with_environment_context(1:string dbname, 2:string name, 3:bool deleteData,
       4:EnvironmentContext environment_context)
                        throws(1:NoSuchObjectException o1, 2:MetaException o3)
+  void truncate_table(1:string dbName, 2:string tableName, 3:list<string> partNames)
+                          throws(1:MetaException o1)
   list<string> get_tables(1: string db_name, 2: string pattern) throws (1: MetaException o1)
   list<string> get_tables_by_type(1: string db_name, 2: string pattern, 3: string tableType) throws (1: MetaException o1)
   list<TableMeta> get_table_meta(1: string db_patterns, 2: string tbl_patterns, 3: list<string> tbl_types)
@@ -1038,6 +1084,11 @@ service ThriftHiveMetastore extends fb303.FacebookService
   Table get_table(1:string dbname, 2:string tbl_name)
                        throws (1:MetaException o1, 2:NoSuchObjectException o2)
   list<Table> get_table_objects_by_name(1:string dbname, 2:list<string> tbl_names)
+  GetTableResult get_table_req(1:GetTableRequest req)
+                       throws (1:MetaException o1, 2:NoSuchObjectException o2)
+  GetTablesResult get_table_objects_by_name_req(1:GetTablesRequest req)
+
+
 				   throws (1:MetaException o1, 2:InvalidOperationException o2, 3:UnknownDBException o3)
 
   // Get a list of table names that match a filter.
@@ -1424,6 +1475,7 @@ service ThriftHiveMetastore extends fb303.FacebookService
   void heartbeat(1:HeartbeatRequest ids) throws (1:NoSuchLockException o1, 2:NoSuchTxnException o2, 3:TxnAbortedException o3)
   HeartbeatTxnRangeResponse heartbeat_txn_range(1:HeartbeatTxnRangeRequest txns)
   void compact(1:CompactionRequest rqst) 
+  CompactionResponse compact2(1:CompactionRequest rqst) 
   ShowCompactResponse show_compact(1:ShowCompactRequest rqst)
   void add_dynamic_partitions(1:AddDynamicPartitions rqst) throws (1:NoSuchTxnException o1, 2:TxnAbortedException o2)
 

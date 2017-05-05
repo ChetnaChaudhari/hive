@@ -97,6 +97,12 @@ public class FileSinkDesc extends AbstractOperatorDesc {
   private Path destPath;
   private boolean isHiveServerQuery;
 
+  /**
+   * Whether is a HiveServer query, and the destination table is
+   * indeed written using ThriftJDBCBinarySerDe
+   */
+  private boolean isUsingThriftJDBCBinarySerDe = false;
+
   public FileSinkDesc() {
   }
 
@@ -164,6 +170,14 @@ public class FileSinkDesc extends AbstractOperatorDesc {
 
   public void setHiveServerQuery(boolean isHiveServerQuery) {
 	  this.isHiveServerQuery = isHiveServerQuery;
+  }
+
+  public boolean isUsingThriftJDBCBinarySerDe() {
+	  return this.isUsingThriftJDBCBinarySerDe;
+  }
+
+  public void setIsUsingThriftJDBCBinarySerDe(boolean isUsingThriftJDBCBinarySerDe) {
+	  this.isUsingThriftJDBCBinarySerDe = isUsingThriftJDBCBinarySerDe;
   }
 
   @Explain(displayName = "directory", explainLevels = { Level.EXTENDED })
@@ -424,7 +438,10 @@ public class FileSinkDesc extends AbstractOperatorDesc {
   public DPSortState getDpSortState() {
     return dpSortState;
   }
-
+  @Explain(displayName = "Dp Sort State")
+  public String getDpSortStateString() {
+    return getDpSortState() == DPSortState.NONE ? null : getDpSortState().toString();
+  }
   public void setDpSortState(DPSortState dpSortState) {
     this.dpSortState = dpSortState;
   }
@@ -436,7 +453,10 @@ public class FileSinkDesc extends AbstractOperatorDesc {
   public AcidUtils.Operation getWriteType() {
     return writeType;
   }
-
+  @Explain(displayName = "Write Type")
+  public String getWriteTypeString() {
+    return getWriteType() == AcidUtils.Operation.NOT_ACID ? null : getWriteType().toString();
+  }
   public void setTransactionId(long id) {
     txnId = id;
   }

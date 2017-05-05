@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import org.apache.hadoop.hive.conf.HiveConf.StrictChecks;
+
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
@@ -69,7 +73,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
       @Override
       public boolean accept(Path p) {
         String name = p.getName();
-        return name.equals("_metadata") ? true : !name.startsWith("_") && !name.startsWith(".");
+        return name.equals(EximUtil.METADATA_NAME) ? true : !name.startsWith("_") && !name.startsWith(".");
       }
     });
     if ((srcs != null) && srcs.length == 1) {
@@ -214,6 +218,12 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     if ((parts != null && parts.size() > 0)
         && (ts.partSpec == null || ts.partSpec.size() == 0)) {
       throw new SemanticException(ErrorMsg.NEED_PARTITION_ERROR.getMsg());
+    }
+    List<String> bucketCols = ts.tableHandle.getBucketCols();
+    if (bucketCols != null && !bucketCols.isEmpty()) {
+      String error = StrictChecks.checkBucketing(conf);
+      if (error != null) throw new SemanticException("Please load into an intermediate table"
+          + " and use 'insert... select' to allow Hive to enforce bucketing. " + error);
     }
 
     // make sure the arguments make sense

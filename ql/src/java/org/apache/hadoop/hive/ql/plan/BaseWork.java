@@ -18,8 +18,9 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.HashTableDummyOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
+import org.apache.hadoop.hive.ql.parse.RuntimeValuesInfo;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.hive.ql.optimizer.physical.VectorizerReason;
 import org.apache.hadoop.hive.ql.plan.Explain.Level;
@@ -87,10 +89,16 @@ public abstract class BaseWork extends AbstractOperatorDesc {
   private boolean allNative;
   private boolean usesVectorUDFAdaptor;
 
+  protected long vectorizedVertexNum;
+
   protected boolean llapMode = false;
   protected boolean uberMode = false;
 
   private int reservedMemoryMB = -1;  // default to -1 means we leave it up to Tez to decide
+
+  // Used for value registry
+  private Map<String, RuntimeValuesInfo> inputSourceToRuntimeValuesInfo =
+          new HashMap<String, RuntimeValuesInfo>();
 
   public void setGatheringStats(boolean gatherStats) {
     this.gatheringStats = gatherStats;
@@ -175,6 +183,14 @@ public abstract class BaseWork extends AbstractOperatorDesc {
     }
 
     return returnSet;
+  }
+
+  public void setVectorizedVertexNum(long vectorizedVertexNum) {
+    this.vectorizedVertexNum = vectorizedVertexNum;
+  }
+
+  public long getVectorizedVertexNum() {
+    return vectorizedVertexNum;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -419,5 +435,14 @@ public abstract class BaseWork extends AbstractOperatorDesc {
 
   public List<String> getSortCols() {
     return sortColNames;
+  }
+
+  public Map<String, RuntimeValuesInfo> getInputSourceToRuntimeValuesInfo() {
+    return inputSourceToRuntimeValuesInfo;
+  }
+
+  public void setInputSourceToRuntimeValuesInfo(
+          String workName, RuntimeValuesInfo runtimeValuesInfo) {
+    inputSourceToRuntimeValuesInfo.put(workName, runtimeValuesInfo);
   }
 }

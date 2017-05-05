@@ -1,3 +1,7 @@
+set hive.map.aggr=false;
+
+set hive.strict.checks.bucketing=false;
+
 set hive.security.authorization.manager=org.apache.hadoop.hive.ql.security.authorization.DefaultHiveAuthorizationProvider;
 set hive.metastore.filter.hook=org.apache.hadoop.hive.metastore.DefaultMetaStoreFilterHookImpl;
 set hive.mapred.mode=nonstrict;

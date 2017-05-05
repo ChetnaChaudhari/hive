@@ -17,9 +17,7 @@
  */
 package org.apache.hadoop.hive.ql.exec.tez;
 
-
 import java.util.Collection;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -40,9 +38,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-
 import javax.security.auth.login.LoginException;
-
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -83,6 +79,7 @@ import org.apache.tez.serviceplugins.api.TaskCommunicatorDescriptor;
 import org.apache.tez.serviceplugins.api.TaskSchedulerDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hive.ql.exec.tez.monitoring.TezJobMonitor;
 
 /**
  * Holds session state related to Tez
@@ -223,7 +220,12 @@ public class TezSessionState {
         IllegalArgumentException, URISyntaxException, TezException {
     this.conf = conf;
     // TODO Why is the queue name set again. It has already been setup via setQueueName. Do only one of the two.
-    this.queueName = conf.get(TezConfiguration.TEZ_QUEUE_NAME);
+    String confQueueName = conf.get(TezConfiguration.TEZ_QUEUE_NAME);
+    if (queueName != null && !queueName.equals(confQueueName)) {
+      LOG.warn("Resetting a queue name that was already set: was "
+          + queueName + ", now " + confQueueName);
+    }
+    this.queueName = confQueueName;
     this.doAsEnabled = conf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS);
 
     final boolean llapMode = "llap".equalsIgnoreCase(HiveConf.getVar(
@@ -306,6 +308,8 @@ public class TezSessionState {
       tezConfig.setInt(TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS, n);
     }
 
+    setupSessionAcls(tezConfig, conf);
+
     final TezClient session = TezClient.newBuilder("HIVE-" + sessionId, tezConfig)
         .setIsSession(true).setLocalResources(commonLocalResources)
         .setCredentials(llapCredentials).setServicePluginDescriptor(servicePluginsDescriptor)
@@ -341,6 +345,7 @@ public class TezSessionState {
       String user, final Configuration conf) throws IOException {
     // TODO: parts of this should be moved out of TezSession to reuse the clients, but there's
     //       no good place for that right now (HIVE-13698).
+    // TODO: De-link from SessionState. A TezSession can be linked to different Hive Sessions via the pool.
     SessionState session = SessionState.get();
     boolean isInHs2 = session != null && session.isHiveServerQuery();
     Token<LlapTokenIdentifier> token = null;
@@ -429,6 +434,33 @@ public class TezSessionState {
     } catch (ExecutionException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void setupSessionAcls(Configuration tezConf, HiveConf hiveConf) throws
+      IOException {
+
+    // TODO: De-link from SessionState. A TezSession can be linked to different Hive Sessions via the pool.
+    String user = SessionState.getUserFromAuthenticator();
+    UserGroupInformation loginUserUgi = UserGroupInformation.getLoginUser();
+    String loginUser =
+        loginUserUgi == null ? null : loginUserUgi.getShortUserName();
+    boolean addHs2User =
+        HiveConf.getBoolVar(hiveConf, ConfVars.HIVETEZHS2USERACCESS);
+
+    String viewStr = Utilities.getAclStringWithHiveModification(tezConf,
+            TezConfiguration.TEZ_AM_VIEW_ACLS, addHs2User, user, loginUser);
+    String modifyStr = Utilities.getAclStringWithHiveModification(tezConf,
+            TezConfiguration.TEZ_AM_MODIFY_ACLS, addHs2User, user, loginUser);
+
+    if (LOG.isDebugEnabled()) {
+      // TODO: De-link from SessionState. A TezSession can be linked to different Hive Sessions via the pool.
+      LOG.debug(
+          "Setting Tez Session access for sessionId={} with viewAclString={}, modifyStr={}",
+          SessionState.get().getSessionId(), viewStr, modifyStr);
+    }
+
+    tezConf.set(TezConfiguration.TEZ_AM_VIEW_ACLS, viewStr);
+    tezConf.set(TezConfiguration.TEZ_AM_MODIFY_ACLS, modifyStr);
   }
 
   public void refreshLocalResourcesFromConf(HiveConf conf)
@@ -563,6 +595,7 @@ public class TezSessionState {
    */
   private Path createTezDir(String sessionId) throws IOException {
     // tez needs its own scratch dir (per session)
+    // TODO: De-link from SessionState. A TezSession can be linked to different Hive Sessions via the pool.
     Path tezDir = new Path(SessionState.get().getHdfsScratchDirURIString(), TEZ_DIR);
     tezDir = new Path(tezDir, sessionId);
     FileSystem fs = tezDir.getFileSystem(conf);
@@ -666,7 +699,7 @@ public class TezSessionState {
   }
 
   public List<LocalResource> getLocalizedResources() {
-    return new ArrayList<LocalResource>(localizedResources);
+    return new ArrayList<>(localizedResources);
   }
 
   public String getUser() {
@@ -693,4 +726,5 @@ public class TezSessionState {
       }
     } while (!ownerThread.compareAndSet(null, newName));
   }
+
 }

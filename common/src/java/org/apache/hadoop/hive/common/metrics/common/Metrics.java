@@ -93,4 +93,20 @@ public interface Metrics {
    * @param variable variable to track.
    */
   public void addGauge(String name, final MetricsVariable variable);
+
+  /**
+   * Add a ratio metric to track the correlation between two variables
+   * @param name name of the ratio gauge
+   * @param numerator numerator of the ratio
+   * @param denominator denominator of the ratio
+   */
+  public void addRatio(String name, MetricsVariable<Integer> numerator,
+                           MetricsVariable<Integer> denominator);
+
+  /**
+   * Mark an event occurance for a meter. Meters measure the rate of an event and track
+   * 1/5/15 minute moving averages
+   * @param name name of the meter
+   */
+  public void markMeter(String name);
 }

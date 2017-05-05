@@ -124,11 +124,9 @@ POSTHOOK: Output: database:default
 POSTHOOK: Output: default@varchar_join1_str_orc
 POSTHOOK: Lineage: varchar_join1_str_orc.c1 SIMPLE [(varchar_join1_str)varchar_join1_str.FieldSchema(name:c1, type:int, comment:null), ]
 POSTHOOK: Lineage: varchar_join1_str_orc.c2 SIMPLE [(varchar_join1_str)varchar_join1_str.FieldSchema(name:c2, type:string, comment:null), ]
-PREHOOK: query: -- Join varchar with same length varchar
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc1_orc b on (a.c2 = b.c2) order by a.c1
+PREHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc1_orc b on (a.c2 = b.c2) order by a.c1
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Join varchar with same length varchar
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc1_orc b on (a.c2 = b.c2) order by a.c1
+POSTHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc1_orc b on (a.c2 = b.c2) order by a.c1
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -181,7 +179,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 3 
@@ -251,11 +249,9 @@ POSTHOOK: Input: default@varchar_join1_vc1_orc
 1	abc	1	abc
 2	abc 	2	abc 
 3	 abc	3	 abc
-PREHOOK: query: -- Join varchar with different length varchar
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc2_orc b on (a.c2 = b.c2) order by a.c1
+PREHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc2_orc b on (a.c2 = b.c2) order by a.c1
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Join varchar with different length varchar
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc2_orc b on (a.c2 = b.c2) order by a.c1
+POSTHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_vc2_orc b on (a.c2 = b.c2) order by a.c1
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -308,7 +304,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 3 
@@ -380,11 +376,9 @@ POSTHOOK: Input: default@varchar_join1_vc2_orc
 1	abc	1	abc
 2	abc 	2	abc 
 3	 abc	3	 abc
-PREHOOK: query: -- Join varchar with string
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_str_orc b on (a.c2 = b.c2) order by a.c1
+PREHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_str_orc b on (a.c2 = b.c2) order by a.c1
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Join varchar with string
-explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_str_orc b on (a.c2 = b.c2) order by a.c1
+POSTHOOK: query: explain vectorization select * from varchar_join1_vc1_orc a join varchar_join1_str_orc b on (a.c2 = b.c2) order by a.c1
 POSTHOOK: type: QUERY
 PLAN VECTORIZATION:
   enabled: true
@@ -437,7 +431,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Map 3 

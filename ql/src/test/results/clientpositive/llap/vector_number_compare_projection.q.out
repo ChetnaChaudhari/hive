@@ -1,6 +1,4 @@
-PREHOOK: query: -- SORT_QUERY_RESULTS
-
-create table vectortab2k(
+PREHOOK: query: create table vectortab2k(
             t tinyint,
             si smallint,
             i int,
@@ -19,9 +17,7 @@ STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@vectortab2k
-POSTHOOK: query: -- SORT_QUERY_RESULTS
-
-create table vectortab2k(
+POSTHOOK: query: create table vectortab2k(
             t tinyint,
             si smallint,
             i int,
@@ -68,11 +64,9 @@ POSTHOOK: Lineage: scratch.t SIMPLE [(vectortab2k)vectortab2k.FieldSchema(name:t
 t	si	i	b	f	d	dc
 PREHOOK: query: INSERT INTO TABLE scratch VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 PREHOOK: type: QUERY
-PREHOOK: Input: default@values__tmp__table__1
 PREHOOK: Output: default@scratch
 POSTHOOK: query: INSERT INTO TABLE scratch VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@values__tmp__table__1
 POSTHOOK: Output: default@scratch
 POSTHOOK: Lineage: scratch.b EXPRESSION [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col4, type:string, comment:), ]
 POSTHOOK: Lineage: scratch.d EXPRESSION [(values__tmp__table__1)values__tmp__table__1.FieldSchema(name:tmp_values_col6, type:string, comment:), ]
@@ -100,18 +94,12 @@ POSTHOOK: Lineage: vectortab2k_orc.i SIMPLE [(scratch)scratch.FieldSchema(name:i
 POSTHOOK: Lineage: vectortab2k_orc.si SIMPLE [(scratch)scratch.FieldSchema(name:si, type:smallint, comment:null), ]
 POSTHOOK: Lineage: vectortab2k_orc.t SIMPLE [(scratch)scratch.FieldSchema(name:t, type:tinyint, comment:null), ]
 scratch.t	scratch.si	scratch.i	scratch.b	scratch.f	scratch.d	scratch.dc
-PREHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-EXPLAIN VECTORIZATION EXPRESSION
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (t < 0) as compare1, (si <= 0) as compare2, (i = 0) as compare3 from vectortab2k_orc
         order by t, si, i) as q
 PREHOOK: type: QUERY
-POSTHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-EXPLAIN VECTORIZATION EXPRESSION
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (t < 0) as compare1, (si <= 0) as compare2, (i = 0) as compare3 from vectortab2k_orc
         order by t, si, i) as q
@@ -154,10 +142,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: tinyint), _col1 (type: smallint), _col2 (type: int)
                       sort order: +++
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 2001 Data size: 273608 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col3 (type: boolean), _col4 (type: boolean), _col5 (type: boolean)
             Execution mode: vectorized, llap
@@ -167,28 +154,44 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Select expression for SELECT operator: UDF GenericUDFHash(Column[KEY.reducesinkkey0], Column[KEY.reducesinkkey1], Column[KEY.reducesinkkey2], Column[VALUE._col0], Column[VALUE._col1], Column[VALUE._col2]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: hash(KEY.reducesinkkey0,KEY.reducesinkkey1,KEY.reducesinkkey2,VALUE._col0,VALUE._col1,VALUE._col2) (type: int)
                 outputColumnNames: _col0
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [6]
+                    selectExpressions: VectorUDFAdaptor(hash(KEY.reducesinkkey0,KEY.reducesinkkey1,KEY.reducesinkkey2,VALUE._col0,VALUE._col1,VALUE._col2)) -> 6:int
                 Statistics: Num rows: 2001 Data size: 273608 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(_col0)
+                  Group By Vectorization:
+                      aggregators: VectorUDAFSumLong(col 6) -> bigint
+                      className: VectorGroupByOperator
+                      vectorOutput: true
+                      native: false
+                      projectedOutputColumns: [0]
                   mode: complete
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   File Output Operator
                     compressed: false
+                    File Sink Vectorization:
+                        className: VectorFileSinkOperator
+                        native: false
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     table:
                         input format: org.apache.hadoop.mapred.SequenceFileInputFormat
@@ -213,7 +216,7 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 -3601806268
 PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION
 SELECT sum(hash(*)) FROM
@@ -263,10 +266,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: tinyint), _col1 (type: smallint), _col2 (type: int), _col3 (type: bigint)
                       sort order: ++++
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 2001 Data size: 273608 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col4 (type: boolean), _col5 (type: boolean), _col6 (type: boolean), _col7 (type: boolean)
             Execution mode: vectorized, llap
@@ -276,28 +278,44 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
-            Execution mode: llap
+            Execution mode: vectorized, llap
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Select expression for SELECT operator: UDF GenericUDFHash(Column[KEY.reducesinkkey0], Column[KEY.reducesinkkey1], Column[KEY.reducesinkkey2], Column[KEY.reducesinkkey3], Column[VALUE._col0], Column[VALUE._col1], Column[VALUE._col2], Column[VALUE._col3]) not supported
-                vectorized: false
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: true
+                vectorized: true
             Reduce Operator Tree:
               Select Operator
                 expressions: hash(KEY.reducesinkkey0,KEY.reducesinkkey1,KEY.reducesinkkey2,KEY.reducesinkkey3,VALUE._col0,VALUE._col1,VALUE._col2,VALUE._col3) (type: int)
                 outputColumnNames: _col0
+                Select Vectorization:
+                    className: VectorSelectOperator
+                    native: true
+                    projectedOutputColumns: [8]
+                    selectExpressions: VectorUDFAdaptor(hash(KEY.reducesinkkey0,KEY.reducesinkkey1,KEY.reducesinkkey2,KEY.reducesinkkey3,VALUE._col0,VALUE._col1,VALUE._col2,VALUE._col3)) -> 8:int
                 Statistics: Num rows: 2001 Data size: 273608 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
                   aggregations: sum(_col0)
+                  Group By Vectorization:
+                      aggregators: VectorUDAFSumLong(col 8) -> bigint
+                      className: VectorGroupByOperator
+                      vectorOutput: true
+                      native: false
+                      projectedOutputColumns: [0]
                   mode: complete
                   outputColumnNames: _col0
                   Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                   File Output Operator
                     compressed: false
+                    File Sink Vectorization:
+                        className: VectorFileSinkOperator
+                        native: false
                     Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
                     table:
                         input format: org.apache.hadoop.mapred.SequenceFileInputFormat
@@ -322,25 +340,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 24462176095
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (t < 0) as compare1, (si <= 0) as compare2, (i = 0) as compare3 from vectortab2k_orc
         where pmod(t, 4) > 1
         order by t, si, i) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (t < 0) as compare1, (si <= 0) as compare2, (i = 0) as compare3 from vectortab2k_orc
         where pmod(t, 4) > 1
         order by t, si, i) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 62396741790
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, b, (t > 0) as compare1, (si >= 0) as compare2, (i != 0) as compare3, (b > 0) as compare4 from vectortab2k_orc
@@ -356,27 +372,21 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 14122059922
-PREHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (0 < t) as compare1, (0 <= si) as compare2, (0 = i) as compare3 from vectortab2k_orc
         order by t, si, i) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-POSTHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (0 < t) as compare1, (0 <= si) as compare2, (0 = i) as compare3 from vectortab2k_orc
         order by t, si, i) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 -3601796069
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, b, (0 > t) as compare1, (0 >= si) as compare2, (0 != i) as compare3, (0 > b) as compare4 from vectortab2k_orc
@@ -390,25 +400,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 20166891877
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (0 < t) as compare1, (0 <= si) as compare2, (0 = i) as compare3 from vectortab2k_orc
         where pmod(t, 4) > 1
         order by t, si, i) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, (0 < t) as compare1, (0 <= si) as compare2, (0 = i) as compare3 from vectortab2k_orc
         where pmod(t, 4) > 1
         order by t, si, i) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 62396748920
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t, si, i, b, (0 > t) as compare1, (0 >= si) as compare2, (0 != i) as compare3, (0 > b) as compare4 from vectortab2k_orc
@@ -424,7 +432,7 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc
 #### A masked pattern was here ####
-c0
+_c0
 14121946175
 PREHOOK: query: CREATE TABLE scratch_repeat AS SELECT t, si, i, b, bo, 20 as t_repeat,
      9000 as si_repeat, 9233320 as i_repeat, -823823999339992 as b_repeat, false as bo_repeat_false, true as bo_repeat_true FROM vectortab2k
@@ -450,16 +458,12 @@ POSTHOOK: Lineage: scratch_repeat.si_repeat SIMPLE []
 POSTHOOK: Lineage: scratch_repeat.t SIMPLE [(vectortab2k)vectortab2k.FieldSchema(name:t, type:tinyint, comment:null), ]
 POSTHOOK: Lineage: scratch_repeat.t_repeat SIMPLE []
 t	si	i	b	bo	t_repeat	si_repeat	i_repeat	b_repeat	bo_repeat_false	bo_repeat_true
-PREHOOK: query: -- The repeated columns ought to create repeated VectorizedRowBatch for those columns.
--- And then when we do a comparison, we should generate a repeated boolean result.
-CREATE TABLE vectortab2k_orc_repeat STORED AS ORC AS SELECT * FROM scratch_repeat
+PREHOOK: query: CREATE TABLE vectortab2k_orc_repeat STORED AS ORC AS SELECT * FROM scratch_repeat
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@scratch_repeat
 PREHOOK: Output: database:default
 PREHOOK: Output: default@vectortab2k_orc_repeat
-POSTHOOK: query: -- The repeated columns ought to create repeated VectorizedRowBatch for those columns.
--- And then when we do a comparison, we should generate a repeated boolean result.
-CREATE TABLE vectortab2k_orc_repeat STORED AS ORC AS SELECT * FROM scratch_repeat
+POSTHOOK: query: CREATE TABLE vectortab2k_orc_repeat STORED AS ORC AS SELECT * FROM scratch_repeat
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@scratch_repeat
 POSTHOOK: Output: database:default
@@ -476,25 +480,19 @@ POSTHOOK: Lineage: vectortab2k_orc_repeat.si_repeat SIMPLE [(scratch_repeat)scra
 POSTHOOK: Lineage: vectortab2k_orc_repeat.t SIMPLE [(scratch_repeat)scratch_repeat.FieldSchema(name:t, type:tinyint, comment:null), ]
 POSTHOOK: Lineage: vectortab2k_orc_repeat.t_repeat SIMPLE [(scratch_repeat)scratch_repeat.FieldSchema(name:t_repeat, type:int, comment:null), ]
 scratch_repeat.t	scratch_repeat.si	scratch_repeat.i	scratch_repeat.b	scratch_repeat.bo	scratch_repeat.t_repeat	scratch_repeat.si_repeat	scratch_repeat.i_repeat	scratch_repeat.b_repeat	scratch_repeat.bo_repeat_false	scratch_repeat.bo_repeat_true
-PREHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat > 0) as compare1, (si_repeat >= 0) as compare2, (i_repeat = 0) as compare3 from vectortab2k_orc_repeat
         order by t_repeat, si_repeat, i_repeat) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-POSTHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat > 0) as compare1, (si_repeat >= 0) as compare2, (i_repeat = 0) as compare3 from vectortab2k_orc_repeat
         order by t_repeat, si_repeat, i_repeat) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 972535192000
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat < 0) as compare1, (si_repeat <=0) as compare2, (i_repeat != 0) as compare3 from vectortab2k_orc_repeat
@@ -508,25 +506,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 972533210000
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat > 0) as compare1, (si_repeat >= 0) as compare2, (i_repeat = 0) as compare3 from vectortab2k_orc_repeat
         where pmod(si, 4) = 0
         order by t_repeat, si_repeat, i_repeat) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat > 0) as compare1, (si_repeat >= 0) as compare2, (i_repeat = 0) as compare3 from vectortab2k_orc_repeat
         where pmod(si, 4) = 0
         order by t_repeat, si_repeat, i_repeat) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 231949643292
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (t_repeat < 0) as compare1, (si_repeat <=0) as compare2, (i_repeat != 0) as compare3 from vectortab2k_orc_repeat
@@ -542,27 +538,21 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 235353036820
-PREHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 > t_repeat) as compare1, (0 >= si_repeat) as compare2, (0 = i_repeat) as compare3 from vectortab2k_orc_repeat
         order by t_repeat, si_repeat, i_repeat) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-POSTHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 > t_repeat) as compare1, (0 >= si_repeat) as compare2, (0 = i_repeat) as compare3 from vectortab2k_orc_repeat
         order by t_repeat, si_repeat, i_repeat) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 972533208000
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 < t_repeat) as compare1, (0 <= si_repeat) as compare2, (0 != i_repeat) as compare3 from vectortab2k_orc_repeat
@@ -576,25 +566,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 972535194000
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 > t_repeat) as compare1, (0 >= si_repeat) as compare2, (0 = i_repeat) as compare3 from vectortab2k_orc_repeat
         where pmod(si, 4) = 0
         order by t_repeat, si_repeat, i_repeat) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 > t_repeat) as compare1, (0 >= si_repeat) as compare2, (0 = i_repeat) as compare3 from vectortab2k_orc_repeat
         where pmod(si, 4) = 0
         order by t_repeat, si_repeat, i_repeat) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 231949170108
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_repeat, si_repeat, i_repeat, (0 < t_repeat) as compare1, (0 <= si_repeat) as compare2, (0 != i_repeat) as compare3 from vectortab2k_orc_repeat
@@ -610,7 +598,7 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_repeat
 #### A masked pattern was here ####
-c0
+_c0
 235353516948
 PREHOOK: query: CREATE TABLE scratch_null AS SELECT t, si, i, b, bo,
      cast(null as tinyint) as t_null, cast(null as smallint) as si_null, cast(null as int) as i_null, cast(null as bigint) as b_null, cast(null as boolean) as bo_null FROM vectortab2k
@@ -635,14 +623,12 @@ POSTHOOK: Lineage: scratch_null.si_null SIMPLE []
 POSTHOOK: Lineage: scratch_null.t SIMPLE [(vectortab2k)vectortab2k.FieldSchema(name:t, type:tinyint, comment:null), ]
 POSTHOOK: Lineage: scratch_null.t_null SIMPLE []
 t	si	i	b	bo	t_null	si_null	i_null	b_null	bo_null
-PREHOOK: query: -- The nulled columns ought to create repeated null VectorizedRowBatch for those columns.
-CREATE TABLE vectortab2k_orc_null STORED AS ORC AS SELECT * FROM scratch_null
+PREHOOK: query: CREATE TABLE vectortab2k_orc_null STORED AS ORC AS SELECT * FROM scratch_null
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@scratch_null
 PREHOOK: Output: database:default
 PREHOOK: Output: default@vectortab2k_orc_null
-POSTHOOK: query: -- The nulled columns ought to create repeated null VectorizedRowBatch for those columns.
-CREATE TABLE vectortab2k_orc_null STORED AS ORC AS SELECT * FROM scratch_null
+POSTHOOK: query: CREATE TABLE vectortab2k_orc_null STORED AS ORC AS SELECT * FROM scratch_null
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@scratch_null
 POSTHOOK: Output: database:default
@@ -658,25 +644,19 @@ POSTHOOK: Lineage: vectortab2k_orc_null.si_null SIMPLE [(scratch_null)scratch_nu
 POSTHOOK: Lineage: vectortab2k_orc_null.t SIMPLE [(scratch_null)scratch_null.FieldSchema(name:t, type:tinyint, comment:null), ]
 POSTHOOK: Lineage: vectortab2k_orc_null.t_null SIMPLE [(scratch_null)scratch_null.FieldSchema(name:t_null, type:tinyint, comment:null), ]
 scratch_null.t	scratch_null.si	scratch_null.i	scratch_null.b	scratch_null.bo	scratch_null.t_null	scratch_null.si_null	scratch_null.i_null	scratch_null.b_null	scratch_null.bo_null
-PREHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null > 0) as compare1, (si_null >= 0) as compare2, (i_null = 0) as compare3 from vectortab2k_orc_null
         order by t_null, si_null, i_null) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-POSTHOOK: query: --
--- Projection LongCol<Compare>LongScalar
---
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null > 0) as compare1, (si_null >= 0) as compare2, (i_null = 0) as compare3 from vectortab2k_orc_null
         order by t_null, si_null, i_null) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null < 0) as compare1, (si_null <=0) as compare2, (i_null != 0) as compare3 from vectortab2k_orc_null
@@ -690,25 +670,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null > 0) as compare1, (si_null >= 0) as compare2, (i_null = 0) as compare3 from vectortab2k_orc_null
         where pmod(si, 4) = 0
         order by t_null, si_null, i_null) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null > 0) as compare1, (si_null >= 0) as compare2, (i_null = 0) as compare3 from vectortab2k_orc_null
         where pmod(si, 4) = 0
         order by t_null, si_null, i_null) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (t_null < 0) as compare1, (si_null <=0) as compare2, (i_null != 0) as compare3 from vectortab2k_orc_null
@@ -724,27 +702,21 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
-PREHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 > t_null) as compare1, (0 >= si_null) as compare2, (0 = i_null) as compare3 from vectortab2k_orc_null
         order by t_null, si_null, i_null) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-POSTHOOK: query: --
--- Projection LongScalar<Compare>LongColumn
---
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 > t_null) as compare1, (0 >= si_null) as compare2, (0 = i_null) as compare3 from vectortab2k_orc_null
         order by t_null, si_null, i_null) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 < t_null) as compare1, (0 <= si_null) as compare2, (0 != i_null) as compare3 from vectortab2k_orc_null
@@ -758,25 +730,23 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
-PREHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 > t_null) as compare1, (0 >= si_null) as compare2, (0 = i_null) as compare3 from vectortab2k_orc_null
         where pmod(si, 4) = 0
         order by t_null, si_null, i_null) as q
 PREHOOK: type: QUERY
 PREHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-POSTHOOK: query: -- With some filtering
-SELECT sum(hash(*)) FROM
+POSTHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 > t_null) as compare1, (0 >= si_null) as compare2, (0 = i_null) as compare3 from vectortab2k_orc_null
         where pmod(si, 4) = 0
         order by t_null, si_null, i_null) as q
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0
 PREHOOK: query: SELECT sum(hash(*)) FROM
     (SELECT t_null, si_null, i_null, (0 < t_null) as compare1, (0 <= si_null) as compare2, (0 != i_null) as compare3 from vectortab2k_orc_null
@@ -792,5 +762,5 @@ POSTHOOK: query: SELECT sum(hash(*)) FROM
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@vectortab2k_orc_null
 #### A masked pattern was here ####
-c0
+_c0
 0

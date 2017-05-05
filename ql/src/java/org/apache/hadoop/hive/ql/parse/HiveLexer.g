@@ -49,6 +49,7 @@ KW_AND : 'AND';
 KW_OR : 'OR';
 KW_NOT : 'NOT' | '!';
 KW_LIKE : 'LIKE';
+KW_ANY : 'ANY';
 
 KW_IF : 'IF';
 KW_EXISTS : 'EXISTS';
@@ -96,6 +97,7 @@ KW_CLUSTER: 'CLUSTER';
 KW_DISTRIBUTE: 'DISTRIBUTE';
 KW_SORT: 'SORT';
 KW_UNION: 'UNION';
+KW_EXCEPT: 'EXCEPT';
 KW_LOAD: 'LOAD';
 KW_EXPORT: 'EXPORT';
 KW_IMPORT: 'IMPORT';
@@ -120,7 +122,7 @@ KW_COMMENT: 'COMMENT';
 KW_BOOLEAN: 'BOOLEAN';
 KW_TINYINT: 'TINYINT';
 KW_SMALLINT: 'SMALLINT';
-KW_INT: 'INT';
+KW_INT: 'INT' | 'INTEGER';
 KW_BIGINT: 'BIGINT';
 KW_FLOAT: 'FLOAT';
 KW_DOUBLE: 'DOUBLE';
@@ -129,7 +131,7 @@ KW_DATE: 'DATE';
 KW_DATETIME: 'DATETIME';
 KW_TIMESTAMP: 'TIMESTAMP';
 KW_INTERVAL: 'INTERVAL';
-KW_DECIMAL: 'DECIMAL';
+KW_DECIMAL: 'DECIMAL' | 'DEC';
 KW_STRING: 'STRING';
 KW_CHAR: 'CHAR';
 KW_VARCHAR: 'VARCHAR';
@@ -302,15 +304,15 @@ KW_AUTHORIZATION: 'AUTHORIZATION';
 KW_CONF: 'CONF';
 KW_VALUES: 'VALUES';
 KW_RELOAD: 'RELOAD';
-KW_YEAR: 'YEAR';
+KW_YEAR: 'YEAR' | 'YEARS';
 KW_QUARTER: 'QUARTER';
-KW_MONTH: 'MONTH';
-KW_WEEK: 'WEEK';
-KW_DAY: 'DAY';
+KW_MONTH: 'MONTH' | 'MONTHS';
+KW_WEEK: 'WEEK' | 'WEEKS';
+KW_DAY: 'DAY' | 'DAYS';
 KW_DOW: 'DAYOFWEEK';
-KW_HOUR: 'HOUR';
-KW_MINUTE: 'MINUTE';
-KW_SECOND: 'SECOND';
+KW_HOUR: 'HOUR' | 'HOURS';
+KW_MINUTE: 'MINUTE' | 'MINUTES';
+KW_SECOND: 'SECOND' | 'SECONDS';
 KW_START: 'START';
 KW_TRANSACTION: 'TRANSACTION';
 KW_COMMIT: 'COMMIT';
@@ -335,11 +337,17 @@ KW_KEY: 'KEY';
 KW_ABORT: 'ABORT';
 KW_EXTRACT: 'EXTRACT';
 KW_FLOOR: 'FLOOR';
+KW_MERGE: 'MERGE';
+KW_MATCHED: 'MATCHED';
+KW_REPL: 'REPL';
+KW_DUMP: 'DUMP';
+KW_STATUS: 'STATUS';
 KW_VECTORIZATION: 'VECTORIZATION';
 KW_SUMMARY: 'SUMMARY';
 KW_OPERATOR: 'OPERATOR';
 KW_EXPRESSION: 'EXPRESSION';
 KW_DETAIL: 'DETAIL';
+KW_WAIT: 'WAIT';
 
 // Operators
 // NOTE: if you add a new function/operator, add it to sysFuncNames so that describe function _FUNC_ will work.
@@ -374,6 +382,7 @@ DIV : 'DIV';
 AMPERSAND : '&';
 TILDE : '~';
 BITWISEOR : '|';
+CONCATENATE : '||';
 BITWISEXOR : '^';
 QUESTION : '?';
 DOLLAR : '$';
@@ -485,8 +494,10 @@ CharSetName
 WS  :  (' '|'\r'|'\t'|'\n') {$channel=HIDDEN;}
     ;
 
-COMMENT
-  : '--' (~('\n'|'\r'))*
-    { $channel=HIDDEN; }
-  ;
+LINE_COMMENT
+    : '--' (~('\n'|'\r'))* { $channel=HIDDEN; }
+    ;
 
+QUERY_HINT
+    : '/*' (options { greedy=false; } : QUERY_HINT|.)* '*/' { if(getText().charAt(2) != '+') { $channel=HIDDEN; } else { setText(getText().substring(3, getText().length() - 2)); } }
+    ;

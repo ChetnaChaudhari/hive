@@ -50,7 +50,7 @@ public class GroupByDesc extends AbstractOperatorDesc {
    * MERGEPARTIAL: FINAL for non-distinct aggregations, COMPLETE for distinct
    * aggregations.
    */
-  private static long serialVersionUID = 1L;
+  private static final long serialVersionUID = 1L;
 
   /**
    * Mode.
@@ -77,7 +77,7 @@ public class GroupByDesc extends AbstractOperatorDesc {
   private boolean dontResetAggrsDistinct;
 
   public GroupByDesc() {
-    vectorDesc = null;
+    vectorDesc = new VectorGroupByDesc();
   }
 
   public GroupByDesc(
@@ -108,7 +108,7 @@ public class GroupByDesc extends AbstractOperatorDesc {
       final boolean groupingSetsPresent,
       final int groupingSetsPosition,
       final boolean isDistinct) {
-    vectorDesc = null;
+    vectorDesc = new VectorGroupByDesc();
     this.mode = mode;
     this.outputColumnNames = outputColumnNames;
     this.keys = keys;

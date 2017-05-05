@@ -1,18 +1,8 @@
-PREHOOK: query: -- Test timestamp functions in vectorized mode to verify they run correctly end-to-end.
--- Turning on vectorization has been temporarily moved after filling the test table
--- due to bug HIVE-8197.
-
-
-CREATE TABLE alltypesorc_string(ctimestamp1 timestamp, stimestamp1 string) STORED AS ORC
+PREHOOK: query: CREATE TABLE alltypesorc_string(ctimestamp1 timestamp, stimestamp1 string) STORED AS ORC
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@alltypesorc_string
-POSTHOOK: query: -- Test timestamp functions in vectorized mode to verify they run correctly end-to-end.
--- Turning on vectorization has been temporarily moved after filling the test table
--- due to bug HIVE-8197.
-
-
-CREATE TABLE alltypesorc_string(ctimestamp1 timestamp, stimestamp1 string) STORED AS ORC
+POSTHOOK: query: CREATE TABLE alltypesorc_string(ctimestamp1 timestamp, stimestamp1 string) STORED AS ORC
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@alltypesorc_string
@@ -136,10 +126,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: bigint)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 40 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: int), _col2 (type: int), _col3 (type: int), _col4 (type: int), _col5 (type: int), _col6 (type: int), _col7 (type: int), _col8 (type: int)
             Execution mode: vectorized, llap
@@ -149,7 +138,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -320,10 +309,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: bigint)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 40 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: int), _col2 (type: int), _col3 (type: int), _col4 (type: int), _col5 (type: int), _col6 (type: int), _col7 (type: int), _col8 (type: int)
             Execution mode: vectorized, llap
@@ -333,7 +321,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -504,10 +492,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: boolean)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 40 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: boolean), _col2 (type: boolean), _col3 (type: boolean), _col4 (type: boolean), _col5 (type: boolean), _col6 (type: boolean), _col7 (type: boolean), _col8 (type: boolean)
             Execution mode: vectorized, llap
@@ -517,7 +504,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -555,8 +542,7 @@ STAGE PLANS:
       Processor Tree:
         ListSink
 
-PREHOOK: query: -- Should all be true or NULL
-SELECT
+PREHOOK: query: SELECT
   to_unix_timestamp(ctimestamp1) = to_unix_timestamp(stimestamp1) AS c1,
   year(ctimestamp1) = year(stimestamp1),
   month(ctimestamp1) = month(stimestamp1),
@@ -571,8 +557,7 @@ ORDER BY c1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@alltypesorc_string
 #### A masked pattern was here ####
-POSTHOOK: query: -- Should all be true or NULL
-SELECT
+POSTHOOK: query: SELECT
   to_unix_timestamp(ctimestamp1) = to_unix_timestamp(stimestamp1) AS c1,
   year(ctimestamp1) = year(stimestamp1),
   month(ctimestamp1) = month(stimestamp1),
@@ -627,8 +612,7 @@ NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
 NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
 NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
 NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL
-PREHOOK: query: -- Wrong format. Should all be NULL.
-EXPLAIN VECTORIZATION EXPRESSION  SELECT
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT
   to_unix_timestamp(stimestamp1) AS c1,
   year(stimestamp1),
   month(stimestamp1),
@@ -641,8 +625,7 @@ EXPLAIN VECTORIZATION EXPRESSION  SELECT
 FROM alltypesorc_wrong
 ORDER BY c1
 PREHOOK: type: QUERY
-POSTHOOK: query: -- Wrong format. Should all be NULL.
-EXPLAIN VECTORIZATION EXPRESSION  SELECT
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT
   to_unix_timestamp(stimestamp1) AS c1,
   year(stimestamp1),
   month(stimestamp1),
@@ -692,10 +675,9 @@ STAGE PLANS:
                       key expressions: _col0 (type: bigint)
                       sort order: +
                       Reduce Sink Vectorization:
-                          className: VectorReduceSinkOperator
-                          native: false
-                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                          nativeConditionsNotMet: Uniform Hash IS false
+                          className: VectorReduceSinkObjectHashOperator
+                          native: true
+                          nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                       Statistics: Num rows: 3 Data size: 294 Basic stats: COMPLETE Column stats: NONE
                       value expressions: _col1 (type: int), _col2 (type: int), _col3 (type: int), _col4 (type: int), _col5 (type: int), _col6 (type: int), _col7 (type: int), _col8 (type: int)
             Execution mode: vectorized, llap
@@ -705,7 +687,7 @@ STAGE PLANS:
                 enabledConditionsMet: hive.vectorized.use.vectorized.input.format IS true
                 groupByVectorOutput: true
                 inputFileFormats: org.apache.hadoop.hive.ql.io.orc.OrcInputFormat
-                allNative: false
+                allNative: true
                 usesVectorUDFAdaptor: false
                 vectorized: true
         Reducer 2 
@@ -803,7 +785,7 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -836,10 +818,9 @@ STAGE PLANS:
                       Reduce Output Operator
                         sort order: 
                         Reduce Sink Vectorization:
-                            className: VectorReduceSinkOperator
-                            native: false
-                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, Not ACID UPDATE or DELETE IS true, No buckets IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
-                            nativeConditionsNotMet: Uniform Hash IS false
+                            className: VectorReduceSinkObjectHashOperator
+                            native: true
+                            nativeConditionsMet: hive.vectorized.execution.reducesink.new.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, No TopN IS true, No DISTINCT columns IS true, BinarySortableSerDe for keys IS true, LazyBinarySerDe for values IS true
                         Statistics: Num rows: 1 Data size: 96 Basic stats: COMPLETE Column stats: NONE
                         value expressions: _col0 (type: timestamp), _col1 (type: timestamp), _col2 (type: bigint), _col3 (type: bigint)
             Execution mode: vectorized, llap
@@ -909,13 +890,11 @@ POSTHOOK: type: QUERY
 POSTHOOK: Input: default@alltypesorc_string
 #### A masked pattern was here ####
 NULL	NULL	0	40
-PREHOOK: query: -- SUM of timestamps are not vectorized reduce-side because they produce a double instead of a long (HIVE-8211)...
-EXPLAIN VECTORIZATION EXPRESSION  SELECT
+PREHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT
   round(sum(ctimestamp1), 3)
 FROM alltypesorc_string
 PREHOOK: type: QUERY
-POSTHOOK: query: -- SUM of timestamps are not vectorized reduce-side because they produce a double instead of a long (HIVE-8211)...
-EXPLAIN VECTORIZATION EXPRESSION  SELECT
+POSTHOOK: query: EXPLAIN VECTORIZATION EXPRESSION  SELECT
   round(sum(ctimestamp1), 3)
 FROM alltypesorc_string
 POSTHOOK: type: QUERY
@@ -932,7 +911,7 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 
@@ -1056,7 +1035,7 @@ STAGE PLANS:
     Tez
 #### A masked pattern was here ####
       Edges:
-        Reducer 2 <- Map 1 (SIMPLE_EDGE)
+        Reducer 2 <- Map 1 (CUSTOM_SIMPLE_EDGE)
 #### A masked pattern was here ####
       Vertices:
         Map 1 

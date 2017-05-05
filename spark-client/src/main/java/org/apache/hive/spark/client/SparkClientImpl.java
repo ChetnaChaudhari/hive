@@ -45,6 +45,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -53,6 +54,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hive.conf.Constants;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.shims.Utils;
@@ -136,7 +138,12 @@ class SparkClientImpl implements SparkClient {
 
   @Override
   public <T extends Serializable> JobHandle<T> submit(Job<T> job) {
-    return protocol.submit(job);
+    return protocol.submit(job, Collections.<JobHandle.Listener<T>>emptyList());
+  }
+
+  @Override
+  public <T extends Serializable> JobHandle<T> submit(Job<T> job, List<JobHandle.Listener<T>> listeners) {
+    return protocol.submit(job, listeners);
   }
 
   @Override
@@ -206,6 +213,7 @@ class SparkClientImpl implements SparkClient {
 
     if (conf.containsKey(SparkClientFactory.CONF_KEY_IN_PROCESS)) {
       // Mostly for testing things quickly. Do not do this in production.
+      // when invoked in-process it inherits the environment variables of the parent
       LOG.warn("!!!! Running remote driver in-process. !!!!");
       runnable = new Runnable() {
         @Override
@@ -325,8 +333,9 @@ class SparkClientImpl implements SparkClient {
       // SparkSubmit will take care of that for us.
       String master = conf.get("spark.master");
       Preconditions.checkArgument(master != null, "spark.master is not defined.");
+      String deployMode = conf.get("spark.submit.deployMode");
 
-      List<String> argv = Lists.newArrayList();
+      List<String> argv = Lists.newLinkedList();
 
       if (sparkHome != null) {
         argv.add(new File(sparkHome, "bin/spark-submit").getAbsolutePath());
@@ -334,7 +343,9 @@ class SparkClientImpl implements SparkClient {
         LOG.info("No spark.home provided, calling SparkSubmit directly.");
         argv.add(new File(System.getProperty("java.home"), "bin/java").getAbsolutePath());
 
-        if (master.startsWith("local") || master.startsWith("mesos") || master.endsWith("-client") || master.startsWith("spark")) {
+        if (master.startsWith("local") || master.startsWith("mesos") ||
+            SparkClientUtilities.isYarnClientMode(master, deployMode) ||
+            master.startsWith("spark")) {
           String mem = conf.get("spark.driver.memory");
           if (mem != null) {
             argv.add("-Xms" + mem);
@@ -365,17 +376,7 @@ class SparkClientImpl implements SparkClient {
         argv.add("org.apache.spark.deploy.SparkSubmit");
       }
 
-      if ("kerberos".equals(hiveConf.get(HADOOP_SECURITY_AUTHENTICATION))) {
-          String principal = SecurityUtil.getServerPrincipal(hiveConf.getVar(ConfVars.HIVE_SERVER2_KERBEROS_PRINCIPAL),
-              "0.0.0.0");
-          String keyTabFile = hiveConf.getVar(ConfVars.HIVE_SERVER2_KERBEROS_KEYTAB);
-          argv.add("--principal");
-          argv.add(principal);
-          argv.add("--keytab");
-          argv.add(keyTabFile);
-      }
-
-      if (master.equals("yarn-cluster")) {
+      if (SparkClientUtilities.isYarnClusterMode(master, deployMode)) {
         String executorCores = conf.get("spark.executor.cores");
         if (executorCores != null) {
           argv.add("--executor-cores");
@@ -392,6 +393,34 @@ class SparkClientImpl implements SparkClient {
         if (numOfExecutors != null) {
           argv.add("--num-executors");
           argv.add(numOfExecutors);
+        }
+      }
+      // The options --principal/--keypad do not work with --proxy-user in spark-submit.sh
+      // (see HIVE-15485, SPARK-5493, SPARK-19143), so Hive could only support doAs or
+      // delegation token renewal, but not both. Since doAs is a more common case, if both
+      // are needed, we choose to favor doAs. So when doAs is enabled, we use kinit command,
+      // otherwise, we pass the principal/keypad to spark to support the token renewal for
+      // long-running application.
+      if ("kerberos".equals(hiveConf.get(HADOOP_SECURITY_AUTHENTICATION))) {
+        String principal = SecurityUtil.getServerPrincipal(hiveConf.getVar(ConfVars.HIVE_SERVER2_KERBEROS_PRINCIPAL),
+            "0.0.0.0");
+        String keyTabFile = hiveConf.getVar(ConfVars.HIVE_SERVER2_KERBEROS_KEYTAB);
+        if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS)) {
+          List<String> kinitArgv = Lists.newLinkedList();
+          kinitArgv.add("kinit");
+          kinitArgv.add(principal);
+          kinitArgv.add("-k");
+          kinitArgv.add("-t");
+          kinitArgv.add(keyTabFile + ";");
+          kinitArgv.addAll(argv);
+          argv = kinitArgv;
+        } else {
+          // if doAs is not enabled, we pass the principal/keypad to spark-submit in order to
+          // support the possible delegation token renewal in Spark
+          argv.add("--principal");
+          argv.add(principal);
+          argv.add("--keytab");
+          argv.add(keyTabFile);
         }
       }
       if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS)) {
@@ -440,7 +469,12 @@ class SparkClientImpl implements SparkClient {
       // Prevent hive configurations from being visible in Spark.
       pb.environment().remove("HIVE_HOME");
       pb.environment().remove("HIVE_CONF_DIR");
-
+      // Add credential provider password to the child process's environment
+      // In case of Spark the credential provider location is provided in the jobConf when the job is submitted
+      String password = getSparkJobCredentialProviderPassword();
+      if(password != null) {
+        pb.environment().put(Constants.HADOOP_CREDENTIAL_PASSWORD_ENVVAR, password);
+      }
       if (isTesting != null) {
         pb.environment().put("SPARK_TESTING", isTesting);
       }
@@ -485,6 +519,15 @@ class SparkClientImpl implements SparkClient {
     return thread;
   }
 
+  private String getSparkJobCredentialProviderPassword() {
+    if (conf.containsKey("spark.yarn.appMasterEnv.HADOOP_CREDSTORE_PASSWORD")) {
+      return conf.get("spark.yarn.appMasterEnv.HADOOP_CREDSTORE_PASSWORD");
+    } else if (conf.containsKey("spark.executorEnv.HADOOP_CREDSTORE_PASSWORD")) {
+      return conf.get("spark.executorEnv.HADOOP_CREDSTORE_PASSWORD");
+    }
+    return null;
+  }
+
   private void redirect(String name, Redirector redirector) {
     Thread thread = new Thread(redirector);
     thread.setName(name);
@@ -494,10 +537,11 @@ class SparkClientImpl implements SparkClient {
 
   private class ClientProtocol extends BaseProtocol {
 
-    <T extends Serializable> JobHandleImpl<T> submit(Job<T> job) {
+    <T extends Serializable> JobHandleImpl<T> submit(Job<T> job, List<JobHandle.Listener<T>> listeners) {
       final String jobId = UUID.randomUUID().toString();
       final Promise<T> promise = driverRpc.createPromise();
-      final JobHandleImpl<T> handle = new JobHandleImpl<T>(SparkClientImpl.this, promise, jobId);
+      final JobHandleImpl<T> handle =
+          new JobHandleImpl<T>(SparkClientImpl.this, promise, jobId, listeners);
       jobs.put(jobId, handle);
 
       final io.netty.util.concurrent.Future<Void> rpc = driverRpc.call(new JobRequest(jobId, job));
@@ -509,6 +553,7 @@ class SparkClientImpl implements SparkClient {
         @Override
         public void operationComplete(io.netty.util.concurrent.Future<Void> f) {
           if (f.isSuccess()) {
+            // If the spark job finishes before this listener is called, the QUEUED status will not be set
             handle.changeState(JobHandle.State.QUEUED);
           } else if (!promise.isDone()) {
             promise.setFailure(f.cause());

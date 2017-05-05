@@ -69,12 +69,26 @@ public class FetchWork implements Serializable {
 
   private boolean isHiveServerQuery;
 
+  /**
+   * Whether is a HiveServer query, and the destination table is
+   * indeed written using ThriftJDBCBinarySerDe
+   */
+  private boolean isUsingThriftJDBCBinarySerDe = false;
+
   public boolean isHiveServerQuery() {
 	return isHiveServerQuery;
   }
 
   public void setHiveServerQuery(boolean isHiveServerQuery) {
 	this.isHiveServerQuery = isHiveServerQuery;
+  }
+
+  public boolean isUsingThriftJDBCBinarySerDe() {
+	  return isUsingThriftJDBCBinarySerDe;
+  }
+
+  public void setIsUsingThriftJDBCBinarySerDe(boolean isUsingThriftJDBCBinarySerDe) {
+	  this.isUsingThriftJDBCBinarySerDe = isUsingThriftJDBCBinarySerDe;
   }
 
   public FetchWork() {
@@ -208,7 +222,7 @@ public class FetchWork implements Serializable {
     if (partDir != null && partDir.size() > 1) {
       if (partDesc == null || partDir.size() != partDesc.size()) {
         throw new RuntimeException(
-            "Partiton Directory list size doesn't match Partition Descriptor list size");
+            "Partition Directory list size doesn't match Partition Descriptor list size");
       }
 
       // Construct a sorted Map of Partition Dir - Partition Descriptor; ordering is based on

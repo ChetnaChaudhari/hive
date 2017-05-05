@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.serde2.binarysortable;
 
+import java.util.ArrayList;
 import java.io.EOFException;
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +25,7 @@ import java.util.Random;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hive.serde2.ByteStream.Output;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerdeRandomRowSource;
 import org.apache.hadoop.hive.serde2.VerifyFast;
 import org.apache.hadoop.hive.serde2.binarysortable.fast.BinarySortableDeserializeRead;
@@ -45,8 +46,8 @@ public class TestBinarySortableFast extends TestCase {
   private void testBinarySortableFast(
           SerdeRandomRowSource source, Object[][] rows,
           boolean[] columnSortOrderIsDesc, byte[] columnNullMarker, byte[] columnNotNullMarker,
-          SerDe serde, StructObjectInspector rowOI,
-          SerDe serde_fewer, StructObjectInspector writeRowOI,
+          AbstractSerDe serde, StructObjectInspector rowOI,
+          AbstractSerDe serde_fewer, StructObjectInspector writeRowOI,
           boolean ascending, PrimitiveTypeInfo[] primitiveTypeInfos,
           boolean useIncludeColumns, boolean doWriteFewerColumns, Random r) throws Throwable {
 
@@ -118,7 +119,9 @@ public class TestBinarySortableFast extends TestCase {
               new BinarySortableDeserializeRead(
                   primitiveTypeInfos,
                   /* useExternalBuffer */ false,
-                  columnSortOrderIsDesc);
+                  columnSortOrderIsDesc,
+                  columnNullMarker,
+                  columnNotNullMarker);
 
       BytesWritable bytesWritable = serializeWriteBytes[i];
       binarySortableDeserializeRead.set(
@@ -146,7 +149,9 @@ public class TestBinarySortableFast extends TestCase {
           new BinarySortableDeserializeRead(
               primitiveTypeInfos,
               /* useExternalBuffer */ false,
-              columnSortOrderIsDesc);
+              columnSortOrderIsDesc,
+              columnNullMarker,
+              columnNotNullMarker);
 
       binarySortableDeserializeRead2.set(
           bytesWritable.getBytes(), 0, bytesWritable.getLength() - 1);  // One fewer byte.
@@ -196,7 +201,11 @@ public class TestBinarySortableFast extends TestCase {
           }
         } else {
           if (!object.equals(expected)) {
-            fail("SerDe deserialized value does not match");
+            fail("SerDe deserialized value does not match (expected " +
+              expected.getClass().getName() + " " +
+              expected.toString() + ", actual " +
+              object.getClass().getName() + " " +
+              object.toString() + ")");
           }
         }
       }
@@ -233,10 +242,36 @@ public class TestBinarySortableFast extends TestCase {
           fail("Different byte array lengths: serDeOutput.length " + serDeOutput.length + ", serializeWriteExpected.length " + serializeWriteExpected.length +
                   " mismatchPos " + mismatchPos + " perFieldWriteLengths " + Arrays.toString(perFieldWriteLengthsArray[i]));
         }
+        List<Integer> differentPositions = new ArrayList();
         for (int b = 0; b < serDeOutput.length; b++) {
           if (serDeOutput[b] != serializeWriteExpected[b]) {
-            fail("SerializeWrite and SerDe serialization does not match at position " + b);
+            differentPositions.add(b);
           }
+        }
+        if (differentPositions.size() > 0) {
+          List<String> serializeWriteExpectedFields = new ArrayList<String>();
+          List<String> serDeFields = new ArrayList<String>();
+          int f = 0;
+          int lastBegin = 0;
+          for (int b = 0; b < serDeOutput.length; b++) {
+            int writeLength = perFieldWriteLengthsArray[i][f];
+            if (b + 1 == writeLength) {
+              serializeWriteExpectedFields.add(
+                  displayBytes(serializeWriteExpected, lastBegin, writeLength - lastBegin));
+              serDeFields.add(
+                  displayBytes(serDeOutput, lastBegin, writeLength - lastBegin));
+              f++;
+              lastBegin = b + 1;
+            }
+          }
+          fail("SerializeWrite and SerDe serialization does not match at positions " + differentPositions.toString() +
+              "\n(SerializeWrite: " +
+                  serializeWriteExpectedFields.toString() +
+              "\nSerDe: " +
+                  serDeFields.toString() +
+              "\nperFieldWriteLengths " + Arrays.toString(perFieldWriteLengthsArray[i]) +
+              "\nprimitiveTypeInfos " + Arrays.toString(primitiveTypeInfos) +
+              "\nrow " + Arrays.toString(row));
         }
       }
       serdeBytes[i] = bytesWritable;
@@ -249,7 +284,9 @@ public class TestBinarySortableFast extends TestCase {
               new BinarySortableDeserializeRead(
                   primitiveTypeInfos,
                   /* useExternalBuffer */ false,
-                  columnSortOrderIsDesc);
+                  columnSortOrderIsDesc,
+                  columnNullMarker,
+                  columnNotNullMarker);
 
 
       BytesWritable bytesWritable = serdeBytes[i];
@@ -311,9 +348,9 @@ public class TestBinarySortableFast extends TestCase {
     order = StringUtils.leftPad("", columnCount, '+');
     String nullOrder;
     nullOrder = StringUtils.leftPad("", columnCount, 'a');
-    SerDe serde_ascending = TestBinarySortableSerDe.getSerDe(fieldNames, fieldTypes, order, nullOrder);
+    AbstractSerDe serde_ascending = TestBinarySortableSerDe.getSerDe(fieldNames, fieldTypes, order, nullOrder);
 
-    SerDe serde_ascending_fewer = null;
+    AbstractSerDe serde_ascending_fewer = null;
     if (doWriteFewerColumns) {
       String partialFieldNames = ObjectInspectorUtils.getFieldNames(writeRowStructObjectInspector);
       String partialFieldTypes = ObjectInspectorUtils.getFieldTypes(writeRowStructObjectInspector);
@@ -323,9 +360,9 @@ public class TestBinarySortableFast extends TestCase {
 
     order = StringUtils.leftPad("", columnCount, '-');
     nullOrder = StringUtils.leftPad("", columnCount, 'z');
-    SerDe serde_descending = TestBinarySortableSerDe.getSerDe(fieldNames, fieldTypes, order, nullOrder);
+    AbstractSerDe serde_descending = TestBinarySortableSerDe.getSerDe(fieldNames, fieldTypes, order, nullOrder);
 
-    SerDe serde_descending_fewer = null;
+    AbstractSerDe serde_descending_fewer = null;
     if (doWriteFewerColumns) {
       String partialFieldNames = ObjectInspectorUtils.getFieldNames(writeRowStructObjectInspector);
       String partialFieldTypes = ObjectInspectorUtils.getFieldTypes(writeRowStructObjectInspector);
@@ -335,6 +372,7 @@ public class TestBinarySortableFast extends TestCase {
 
     boolean[] columnSortOrderIsDesc = new boolean[columnCount];
     Arrays.fill(columnSortOrderIsDesc, false);
+
     byte[] columnNullMarker = new byte[columnCount];
     Arrays.fill(columnNullMarker, BinarySortableSerDe.ZERO);
     byte[] columnNotNullMarker = new byte[columnCount];
@@ -425,5 +463,13 @@ public class TestBinarySortableFast extends TestCase {
       e.printStackTrace();
       throw e;
     }
+  }
+
+  private static String displayBytes(byte[] bytes, int start, int length) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = start; i < start + length; i++) {
+      sb.append(String.format("\\%03d", (int) (bytes[i] & 0xff)));
+    }
+    return sb.toString();
   }
 }

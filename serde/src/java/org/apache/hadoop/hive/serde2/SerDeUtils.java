@@ -63,6 +63,8 @@ public final class SerDeUtils {
   public static final char QUOTE = '"';
   public static final char COLON = ':';
   public static final char COMMA = ',';
+  // we should use '\0' for COLUMN_NAME_DELIMITER if column name contains COMMA
+  // but we should also take care of the backward compatibility
   public static final char COLUMN_COMMENTS_DELIMITER = '\0';
   public static final String LBRACKET = "[";
   public static final String RBRACKET = "]";

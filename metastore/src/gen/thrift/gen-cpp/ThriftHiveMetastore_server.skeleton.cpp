@@ -142,6 +142,11 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
     printf("drop_table_with_environment_context\n");
   }
 
+  void truncate_table(const std::string& dbName, const std::string& tableName, const std::vector<std::string> & partNames) {
+    // Your implementation goes here
+    printf("truncate_table\n");
+  }
+
   void get_tables(std::vector<std::string> & _return, const std::string& db_name, const std::string& pattern) {
     // Your implementation goes here
     printf("get_tables\n");
@@ -170,6 +175,16 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   void get_table_objects_by_name(std::vector<Table> & _return, const std::string& dbname, const std::vector<std::string> & tbl_names) {
     // Your implementation goes here
     printf("get_table_objects_by_name\n");
+  }
+
+  void get_table_req(GetTableResult& _return, const GetTableRequest& req) {
+    // Your implementation goes here
+    printf("get_table_req\n");
+  }
+
+  void get_table_objects_by_name_req(GetTablesResult& _return, const GetTablesRequest& req) {
+    // Your implementation goes here
+    printf("get_table_objects_by_name_req\n");
   }
 
   void get_table_names_by_filter(std::vector<std::string> & _return, const std::string& dbname, const std::string& filter, const int16_t max_tables) {
@@ -715,6 +730,11 @@ class ThriftHiveMetastoreHandler : virtual public ThriftHiveMetastoreIf {
   void compact(const CompactionRequest& rqst) {
     // Your implementation goes here
     printf("compact\n");
+  }
+
+  void compact2(CompactionResponse& _return, const CompactionRequest& rqst) {
+    // Your implementation goes here
+    printf("compact2\n");
   }
 
   void show_compact(ShowCompactResponse& _return, const ShowCompactRequest& rqst) {

@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  */
 public class VectorMapJoinDesc extends AbstractVectorDesc  {
 
-  private static long serialVersionUID = 1L;
+  private static final long serialVersionUID = 1L;
 
   public static enum HashTableImplementationType {
     NONE,
@@ -108,13 +108,18 @@ public class VectorMapJoinDesc extends AbstractVectorDesc  {
     vectorMapJoinInfo = null;
   }
 
-  public VectorMapJoinDesc(VectorMapJoinDesc clone) {
-    this.hashTableImplementationType = clone.hashTableImplementationType;
-    this.hashTableKind = clone.hashTableKind;
-    this.hashTableKeyType = clone.hashTableKeyType;
-    this.operatorVariation = clone.operatorVariation;
-    this.minMaxEnabled = clone.minMaxEnabled;
-    this.vectorMapJoinInfo = clone.vectorMapJoinInfo;
+  @Override
+  public VectorMapJoinDesc clone() {
+    VectorMapJoinDesc clone = new VectorMapJoinDesc();
+    clone.hashTableImplementationType = this.hashTableImplementationType;
+    clone.hashTableKind = this.hashTableKind;
+    clone.hashTableKeyType = this.hashTableKeyType;
+    clone.operatorVariation = this.operatorVariation;
+    clone.minMaxEnabled = this.minMaxEnabled;
+    if (vectorMapJoinInfo != null) {
+      throw new RuntimeException("Cloning VectorMapJoinInfo not supported");
+    }
+    return clone;
   }
 
   public HashTableImplementationType hashTableImplementationType() {
@@ -166,6 +171,7 @@ public class VectorMapJoinDesc extends AbstractVectorDesc  {
     return vectorMapJoinInfo;
   }
 
+  private boolean useOptimizedTable;
   private boolean isVectorizationMapJoinNativeEnabled;
   private String engine;
   private boolean oneMapJoinCondition;
@@ -174,9 +180,14 @@ public class VectorMapJoinDesc extends AbstractVectorDesc  {
   private boolean isHybridHashJoin;
   private boolean supportsKeyTypes;
   private List<String> notSupportedKeyTypes;
-  private boolean isEmptyKey;
   private boolean smallTableExprVectorizes;
 
+  public void setUseOptimizedTable(boolean useOptimizedTable) {
+    this.useOptimizedTable = useOptimizedTable;
+  }
+  public boolean getUseOptimizedTable() {
+    return useOptimizedTable;
+  }
   public void setIsVectorizationMapJoinNativeEnabled(boolean isVectorizationMapJoinNativeEnabled) {
     this.isVectorizationMapJoinNativeEnabled = isVectorizationMapJoinNativeEnabled;
   }
@@ -212,12 +223,6 @@ public class VectorMapJoinDesc extends AbstractVectorDesc  {
   }
   public List<String> getNotSupportedKeyTypes() {
     return notSupportedKeyTypes;
-  }
-  public void setIsEmptyKey(boolean isEmptyKey) {
-    this.isEmptyKey = isEmptyKey;
-  }
-  public boolean getIsEmptyKey() {
-    return isEmptyKey;
   }
   public void setSmallTableExprVectorizes(boolean smallTableExprVectorizes) {
     this.smallTableExprVectorizes = smallTableExprVectorizes;

@@ -178,7 +178,6 @@ public class FilterDesc extends AbstractOperatorDesc {
     this.syntheticJoinPredicate = syntheticJoinPredicate;
   }
 
-
   @Override
   public Object clone() {
     FilterDesc filterDesc = new FilterDesc(getPredicate().clone(), getIsSamplingPred());

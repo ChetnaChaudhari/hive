@@ -66,12 +66,10 @@ POSTHOOK: type: LOAD
 #### A masked pattern was here ####
 POSTHOOK: Output: default@employee_part
 POSTHOOK: Output: default@employee_part@employeesalary=3000.0/country=UK
-PREHOOK: query: -- dynamic partitioning syntax
-explain 
+PREHOOK: query: explain 
 analyze table Employee_Part partition (employeeSalary='4000.0', country) compute statistics for columns employeeName, employeeID
 PREHOOK: type: QUERY
-POSTHOOK: query: -- dynamic partitioning syntax
-explain 
+POSTHOOK: query: explain 
 analyze table Employee_Part partition (employeeSalary='4000.0', country) compute statistics for columns employeeName, employeeID
 POSTHOOK: type: QUERY
 STAGE DEPENDENCIES:
@@ -86,8 +84,8 @@ STAGE PLANS:
             alias: employee_part
             Statistics: Num rows: 1 Data size: 64 Basic stats: PARTIAL Column stats: NONE
             Select Operator
-              expressions: country (type: string), employeename (type: string), employeeid (type: int)
-              outputColumnNames: country, employeename, employeeid
+              expressions: employeeid (type: int), employeename (type: string), country (type: string)
+              outputColumnNames: employeeid, employeename, country
               Statistics: Num rows: 1 Data size: 64 Basic stats: PARTIAL Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(employeename, 16), compute_stats(employeeid, 16)
@@ -146,12 +144,10 @@ POSTHOOK: Input: default@employee_part
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 employeeName        	string              	                    	                    	0                   	6                   	5.142857142857143   	6                   	                    	                    	from deserializer   
-PREHOOK: query: -- don't specify all partitioning keys
-explain	
+PREHOOK: query: explain	
 analyze table Employee_Part partition (employeeSalary='2000.0') compute statistics for columns employeeID
 PREHOOK: type: QUERY
-POSTHOOK: query: -- don't specify all partitioning keys
-explain	
+POSTHOOK: query: explain	
 analyze table Employee_Part partition (employeeSalary='2000.0') compute statistics for columns employeeID
 POSTHOOK: type: QUERY
 STAGE DEPENDENCIES:
@@ -166,8 +162,8 @@ STAGE PLANS:
             alias: employee_part
             Statistics: Num rows: 42 Data size: 169 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions: country (type: string), employeeid (type: int)
-              outputColumnNames: country, employeeid
+              expressions: employeeid (type: int), country (type: string)
+              outputColumnNames: employeeid, country
               Statistics: Num rows: 42 Data size: 169 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(employeeid, 16)
@@ -237,12 +233,10 @@ POSTHOOK: Input: default@employee_part
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 employeeID          	int                 	16                  	31                  	0                   	9                   	                    	                    	                    	                    	from deserializer   
-PREHOOK: query: -- don't specify any partitioning keys
-explain	
+PREHOOK: query: explain	
 analyze table Employee_Part partition (employeeSalary) compute statistics for columns employeeID
 PREHOOK: type: QUERY
-POSTHOOK: query: -- don't specify any partitioning keys
-explain	
+POSTHOOK: query: explain	
 analyze table Employee_Part partition (employeeSalary) compute statistics for columns employeeID
 POSTHOOK: type: QUERY
 STAGE DEPENDENCIES:
@@ -257,8 +251,8 @@ STAGE PLANS:
             alias: employee_part
             Statistics: Num rows: 116 Data size: 466 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions: employeesalary (type: double), country (type: string), employeeid (type: int)
-              outputColumnNames: employeesalary, country, employeeid
+              expressions: employeeid (type: int), employeesalary (type: double), country (type: string)
+              outputColumnNames: employeeid, employeesalary, country
               Statistics: Num rows: 116 Data size: 466 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(employeeid, 16)
@@ -345,8 +339,8 @@ STAGE PLANS:
             alias: employee_part
             Statistics: Num rows: 2 Data size: 466 Basic stats: PARTIAL Column stats: NONE
             Select Operator
-              expressions: employeesalary (type: double), country (type: string), employeeid (type: int), employeename (type: string)
-              outputColumnNames: employeesalary, country, employeeid, employeename
+              expressions: employeeid (type: int), employeename (type: string), employeesalary (type: double), country (type: string)
+              outputColumnNames: employeeid, employeename, employeesalary, country
               Statistics: Num rows: 2 Data size: 466 Basic stats: PARTIAL Column stats: NONE
               Group By Operator
                 aggregations: compute_stats(employeeid, 16), compute_stats(employeename, 16)
@@ -415,11 +409,9 @@ POSTHOOK: Input: default@employee_part
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 employeeName        	string              	                    	                    	0                   	6                   	5.142857142857143   	6                   	                    	                    	from deserializer   
-PREHOOK: query: -- partially populated stats
-drop table Employee
+PREHOOK: query: drop table Employee
 PREHOOK: type: DROPTABLE
-POSTHOOK: query: -- partially populated stats
-drop table Employee
+POSTHOOK: query: drop table Employee
 POSTHOOK: type: DROPTABLE
 PREHOOK: query: CREATE TABLE Employee(employeeID int, employeeName String) partitioned by (employeeSalary double, country string)
 row format delimited fields terminated by '|'  stored as textfile
@@ -539,13 +531,11 @@ POSTHOOK: Input: default@employee
 # col_name            	data_type           	min                 	max                 	num_nulls           	distinct_count      	avg_col_len         	max_col_len         	num_trues           	num_falses          	comment             
 	 	 	 	 	 	 	 	 	 	 
 employeeName        	string              	                    	                    	0                   	6                   	5.142857142857143   	6                   	                    	                    	from deserializer   
-PREHOOK: query: -- add columns
-alter table Employee add columns (c int ,d string)
+PREHOOK: query: alter table Employee add columns (c int ,d string)
 PREHOOK: type: ALTERTABLE_ADDCOLS
 PREHOOK: Input: default@employee
 PREHOOK: Output: default@employee
-POSTHOOK: query: -- add columns
-alter table Employee add columns (c int ,d string)
+POSTHOOK: query: alter table Employee add columns (c int ,d string)
 POSTHOOK: type: ALTERTABLE_ADDCOLS
 POSTHOOK: Input: default@employee
 POSTHOOK: Output: default@employee

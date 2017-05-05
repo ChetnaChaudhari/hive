@@ -31,6 +31,7 @@ import org.apache.hadoop.hive.common.classification.InterfaceStability;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AggrStats;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FileMetadataExprType;
@@ -578,6 +579,17 @@ public interface RawStore extends Configurable {
     List<String> partNames, List<String> colNames) throws MetaException, NoSuchObjectException;
 
   /**
+   * Get all partition column statistics for a table
+   * @param dbName
+   * @param tableName
+   * @return Map of partition column statistics
+   * @throws MetaException
+   * @throws NoSuchObjectException
+   */
+  public Map<String, ColumnStatisticsObj> getAggrColStatsForTablePartitions(String dbName,
+      String tableName) throws MetaException, NoSuchObjectException;
+
+  /**
    * Get the next notification event.
    * @param rqst Request containing information on the last processed notification.
    * @return list of notifications, sorted by eventId
@@ -672,6 +684,18 @@ public interface RawStore extends Configurable {
   public abstract List<SQLPrimaryKey> getPrimaryKeys(String db_name,
     String tbl_name) throws MetaException;
 
+  /**
+   * Get the foreign keys for a table.  All foreign keys for a particular table can be fetched by
+   * passing null for the last two arguments.
+   * @param parent_db_name Database the table referred to is in.  This can be null to match all
+   *                       databases.
+   * @param parent_tbl_name Table that is referred to.  This can be null to match all tables.
+   * @param foreign_db_name Database the table with the foreign key is in.
+   * @param foreign_tbl_name Table with the foreign key.
+   * @return List of all matching foreign key columns.  Note that if more than one foreign key
+   * matches the arguments the results here will be all mixed together into a single list.
+   * @throws MetaException if something goes wrong.
+   */
   public abstract List<SQLForeignKey> getForeignKeys(String parent_db_name,
     String parent_tbl_name, String foreign_db_name, String foreign_tbl_name)
     throws MetaException;
