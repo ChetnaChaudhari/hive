@@ -2854,9 +2854,14 @@ public class HBaseStore implements RawStore {
   }
 
   @Override
-  public Map<String, ColumnStatisticsObj> getAggrColStatsForTablePartitions(String dbName,
+  public Map<String, List<ColumnStatisticsObj>> getColStatsForTablePartitions(String dbName,
       String tableName) throws MetaException, NoSuchObjectException {
     // TODO: see if it makes sense to implement this here
     return null;
+  }
+
+  @Override
+  public String getMetastoreDbUuid() throws MetaException {
+    throw new MetaException("Get metastore DB uuid is not implemented");
   }
 }

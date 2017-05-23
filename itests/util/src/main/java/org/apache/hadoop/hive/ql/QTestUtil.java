@@ -350,7 +350,7 @@ public class QTestUtil {
     if (!useHBaseMetastore) {
       // Plug verifying metastore in for testing DirectSQL.
       conf.setVar(HiveConf.ConfVars.METASTORE_RAW_STORE_IMPL,
-        "org.apache.hadoop.hive.metastore.VerifyingObjectStore");
+          "org.apache.hadoop.hive.metastore.VerifyingObjectStore");
     } else {
       conf.setVar(ConfVars.METASTORE_RAW_STORE_IMPL, HBaseStore.class.getName());
       conf.setBoolVar(ConfVars.METASTORE_FASTPATH, true);
@@ -566,7 +566,7 @@ public class QTestUtil {
       System.out.println("Setting hive-site: "+HiveConf.getHiveSiteLocation());
     }
 
-    queryState = new QueryState(new HiveConf(Driver.class));
+    queryState = new QueryState.Builder().withHiveConf(new HiveConf(Driver.class)).build();
     if (useHBaseMetastore) {
       startMiniHBaseCluster();
     } else {
@@ -1699,7 +1699,8 @@ public class QTestUtil {
       ".*at com\\.sun\\.proxy.*",
       ".*at com\\.jolbox.*",
       ".*at com\\.zaxxer.*",
-      "org\\.apache\\.hadoop\\.hive\\.metastore\\.model\\.MConstraint@([0-9]|[a-z])*"
+      "org\\.apache\\.hadoop\\.hive\\.metastore\\.model\\.MConstraint@([0-9]|[a-z])*",
+      "^Repair: Added partition to metastore.*"
   });
 
   private final Pattern[] partialReservedPlanMask = toPattern(new String[] {
@@ -1896,7 +1897,7 @@ public class QTestUtil {
   public void resetParser() throws SemanticException {
     drv.init();
     pd = new ParseDriver();
-    queryState = new QueryState(conf);
+    queryState = new QueryState.Builder().withHiveConf(conf).build();
     sem = new SemanticAnalyzer(queryState);
   }
 
