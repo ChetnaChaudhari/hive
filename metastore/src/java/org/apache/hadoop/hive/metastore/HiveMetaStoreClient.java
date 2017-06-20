@@ -663,7 +663,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
    * @param partitionSpecs partitions specs of the parent partition to be exchanged
    * @param destDb the db of the destination table
    * @param destinationTableName the destination table name
-   @ @return new partition after exchanging
+   * @return new partition after exchanging
    */
   @Override
   public Partition exchange_partition(Map<String, String> partitionSpecs,
@@ -679,7 +679,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
    * @param partitionSpecs partitions specs of the parent partition to be exchanged
    * @param destDb the db of the destination table
    * @param destinationTableName the destination table name
-   @ @return new partitions after exchanging
+   * @return new partitions after exchanging
    */
   @Override
   public List<Partition> exchange_partitions(Map<String, String> partitionSpecs,
@@ -752,9 +752,11 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
 
   @Override
   public void createTableWithConstraints(Table tbl,
-    List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
-    throws AlreadyExistsException, InvalidObjectException,
-    MetaException, NoSuchObjectException, TException {
+    List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys,
+    List<SQLUniqueConstraint> uniqueConstraints,
+    List<SQLNotNullConstraint> notNullConstraints)
+        throws AlreadyExistsException, InvalidObjectException,
+        MetaException, NoSuchObjectException, TException {
     HiveMetaHook hook = getHook(tbl);
     if (hook != null) {
       hook.preCreateTable(tbl);
@@ -762,7 +764,8 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     boolean success = false;
     try {
       // Subclasses can override this step (for example, for temporary tables)
-      client.create_table_with_constraints(tbl, primaryKeys, foreignKeys);
+      client.create_table_with_constraints(tbl, primaryKeys, foreignKeys,
+          uniqueConstraints, notNullConstraints);
       if (hook != null) {
         hook.commitCreateTable(tbl);
       }
@@ -792,7 +795,19 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
     client.add_foreign_key(new AddForeignKeyRequest(foreignKeyCols));
   }
 
-/**
+  @Override
+  public void addUniqueConstraint(List<SQLUniqueConstraint> uniqueConstraintCols) throws
+    NoSuchObjectException, MetaException, TException {
+    client.add_unique_constraint(new AddUniqueConstraintRequest(uniqueConstraintCols));
+  }
+
+  @Override
+  public void addNotNullConstraint(List<SQLNotNullConstraint> notNullConstraintCols) throws
+    NoSuchObjectException, MetaException, TException {
+    client.add_not_null_constraint(new AddNotNullConstraintRequest(notNullConstraintCols));
+  }
+
+  /**
    * @param type
    * @return true or false
    * @throws AlreadyExistsException
@@ -1110,6 +1125,18 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   }
 
   /**
+   * Recycles the files recursively from the input path to the cmroot directory either by copying or moving it.
+   *
+   * @param request Inputs for path of the data files to be recycled to cmroot and
+   *                isPurge flag when set to true files which needs to be recycled are not moved to Trash
+   * @return Response which is currently void
+   */
+  @Override
+  public CmRecycleResponse recycleDirToCmPath(CmRecycleRequest request) throws MetaException, TException {
+    return client.cm_recycle(request);
+  }
+
+  /**
    * @param type
    * @return true if the type is dropped
    * @throws MetaException
@@ -1217,7 +1244,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
    * @param db_name the database name
    * @param tbl_name the table name
    * @param filter the filter string,
-   *    for example "part1 = \"p1_abc\" and part2 <= "\p2_test\"". Filtering can
+   *    for example "part1 = \"p1_abc\" and part2 &lt;= "\p2_test\"". Filtering can
    *    be done only on string partition keys.
    * @param max_parts the maximum number of partitions to return,
    *    all partitions are returned if -1 is passed
@@ -1490,7 +1517,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
    * @param db_name the database name
    * @param tbl_name the table name
    * @param filter the filter string,
-   *    for example "part1 = \"p1_abc\" and part2 <= "\p2_test\"". Filtering can
+   *    for example "part1 = \"p1_abc\" and part2 &lt;= "\p2_test\"". Filtering can
    *    be done only on string partition keys.
    * @return number of partitions
    * @throws MetaException
@@ -1630,6 +1657,18 @@ public class HiveMetaStoreClient implements IMetaStoreClient {
   public List<SQLForeignKey> getForeignKeys(ForeignKeysRequest req) throws MetaException,
     NoSuchObjectException, TException {
     return client.get_foreign_keys(req).getForeignKeys();
+  }
+
+  @Override
+  public List<SQLUniqueConstraint> getUniqueConstraints(UniqueConstraintsRequest req)
+    throws MetaException, NoSuchObjectException, TException {
+    return client.get_unique_constraints(req).getUniqueConstraints();
+  }
+
+  @Override
+  public List<SQLNotNullConstraint> getNotNullConstraints(NotNullConstraintsRequest req)
+    throws MetaException, NoSuchObjectException, TException {
+    return client.get_not_null_constraints(req).getNotNullConstraints();
   }
 
 

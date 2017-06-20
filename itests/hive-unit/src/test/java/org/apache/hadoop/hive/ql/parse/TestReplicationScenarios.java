@@ -21,13 +21,14 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.cli.CliSessionState;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.InjectableBehaviourObjectStore;
-import org.apache.hadoop.hive.metastore.InjectableBehaviourObjectStore.BehaviourInjection;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.InjectableBehaviourObjectStore;
+import org.apache.hadoop.hive.metastore.InjectableBehaviourObjectStore.BehaviourInjection;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
@@ -386,7 +387,6 @@ public class TestReplicationScenarios {
     run("LOAD DATA LOCAL INPATH '" + ptn_locn_2 + "' OVERWRITE INTO TABLE " + dbName + ".ptned PARTITION(b=2)");
     verifySetup("SELECT a from " + dbName + ".ptned WHERE b=2", ptn_data_2);
 
-
     advanceDumpDir();
 
     BehaviourInjection<Table,Table> ptnedTableNuller = new BehaviourInjection<Table,Table>(){
@@ -414,12 +414,14 @@ public class TestReplicationScenarios {
     LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
     run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
 
-    // The ptned table should miss in target as the table was marked cisrtually as dropped
+    // The ptned table should miss in target as the table was marked virtually as dropped
     verifyRun("SELECT * from " + dbName + "_dupe.unptned", unptn_data);
     verifyFail("SELECT a from " + dbName + "_dupe.ptned WHERE b=1");
+    verifyIfTableNotExist(dbName + "_dupe", "ptned");
 
     // Verify if Drop table on a non-existing table is idempotent
     run("DROP TABLE " + dbName + ".ptned");
+    verifyIfTableNotExist(dbName, "ptned");
 
     advanceDumpDir();
     run("REPL DUMP " + dbName + " FROM " + replDumpId);
@@ -429,7 +431,79 @@ public class TestReplicationScenarios {
     assert(run("REPL LOAD " + dbName + "_dupe FROM '" + postDropReplDumpLocn + "'", true));
 
     verifyRun("SELECT * from " + dbName + "_dupe.unptned", unptn_data);
+    verifyIfTableNotExist(dbName + "_dupe", "ptned");
     verifyFail("SELECT a from " + dbName + "_dupe.ptned WHERE b=1");
+  }
+
+  @Test
+  public void testBootstrapWithConcurrentDropPartition() throws IOException {
+    String name = testName.getMethodName();
+    String dbName = createDB(name);
+    run("CREATE TABLE " + dbName + ".ptned(a string) partitioned by (b int) STORED AS TEXTFILE");
+
+    String[] ptn_data_1 = new String[]{ "thirteen", "fourteen", "fifteen"};
+    String[] ptn_data_2 = new String[]{ "fifteen", "sixteen", "seventeen"};
+    String[] empty = new String[]{};
+
+    String ptn_locn_1 = new Path(TEST_PATH, name + "_ptn1").toUri().getPath();
+    String ptn_locn_2 = new Path(TEST_PATH, name + "_ptn2").toUri().getPath();
+
+    createTestDataFile(ptn_locn_1, ptn_data_1);
+    createTestDataFile(ptn_locn_2, ptn_data_2);
+
+    run("LOAD DATA LOCAL INPATH '" + ptn_locn_1 + "' OVERWRITE INTO TABLE " + dbName + ".ptned PARTITION(b=1)");
+    verifySetup("SELECT a from " + dbName + ".ptned WHERE b=1", ptn_data_1);
+    run("LOAD DATA LOCAL INPATH '" + ptn_locn_2 + "' OVERWRITE INTO TABLE " + dbName + ".ptned PARTITION(b=2)");
+    verifySetup("SELECT a from " + dbName + ".ptned WHERE b=2", ptn_data_2);
+
+    advanceDumpDir();
+
+    BehaviourInjection<List<String>, List<String>> listPartitionNamesNuller
+            = new BehaviourInjection<List<String>, List<String>>(){
+      @Nullable
+      @Override
+      public List<String> apply(@Nullable List<String> partitions) {
+        injectionPathCalled = true;
+        return new ArrayList<String>();
+      }
+    };
+    InjectableBehaviourObjectStore.setListPartitionNamesBehaviour(listPartitionNamesNuller);
+
+    // None of the partitions will be dumped as the partitions list was empty
+    run("REPL DUMP " + dbName);
+    listPartitionNamesNuller.assertInjectionsPerformed(true, false);
+    InjectableBehaviourObjectStore.resetListPartitionNamesBehaviour(); // reset the behaviour
+
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    // All partitions should miss in target as it was marked virtually as dropped
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b=1", empty);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b=2", empty);
+    verifyIfPartitionNotExist(dbName + "_dupe", "ptned", new ArrayList<>(Arrays.asList("1")));
+    verifyIfPartitionNotExist(dbName + "_dupe", "ptned", new ArrayList<>(Arrays.asList("2")));
+
+    // Verify if drop partition on a non-existing partition is idempotent and just a noop.
+    run("ALTER TABLE " + dbName + ".ptned DROP PARTITION (b=1)");
+    run("ALTER TABLE " + dbName + ".ptned DROP PARTITION (b=2)");
+    verifyIfPartitionNotExist(dbName, "ptned", new ArrayList<>(Arrays.asList("1")));
+    verifyIfPartitionNotExist(dbName, "ptned", new ArrayList<>(Arrays.asList("2")));
+    verifySetup("SELECT a from " + dbName + ".ptned WHERE b=1", empty);
+    verifySetup("SELECT a from " + dbName + ".ptned WHERE b=2", empty);
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    String postDropReplDumpLocn = getResult(0,0);
+    String postDropReplDumpId = getResult(0,1,true);
+    LOG.info("Dumped to {} with id {}->{}", postDropReplDumpLocn, replDumpId, postDropReplDumpId);
+    assert(run("REPL LOAD " + dbName + "_dupe FROM '" + postDropReplDumpLocn + "'", true));
+
+    verifyIfPartitionNotExist(dbName + "_dupe", "ptned", new ArrayList<>(Arrays.asList("1")));
+    verifyIfPartitionNotExist(dbName + "_dupe", "ptned", new ArrayList<>(Arrays.asList("2")));
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b=1", empty);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b=2", empty);
   }
 
   @Test
@@ -516,6 +590,113 @@ public class TestReplicationScenarios {
   }
 
   @Test
+  public void testIncrementalLoadWithVariableLengthEventId() throws IOException, TException {
+    String testName = "incrementalLoadWithVariableLengthEventId";
+    String dbName = createDB(testName);
+    run("CREATE TABLE " + dbName + ".unptned(a string) STORED AS TEXTFILE");
+    run("INSERT INTO TABLE " + dbName + ".unptned values('ten')");
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName);
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    // CREATE_TABLE - TRUNCATE - INSERT - The result is just one record.
+    // Creating dummy table to control the event ID of TRUNCATE not to be 10 or 100 or 1000...
+    String[] unptn_data = new String[]{ "eleven" };
+    run("CREATE TABLE " + dbName + ".dummy(a string) STORED AS TEXTFILE");
+    run("TRUNCATE TABLE " + dbName + ".unptned");
+    run("INSERT INTO TABLE " + dbName + ".unptned values('" + unptn_data[0] + "')");
+
+    // Inject a behaviour where all events will get ID less than 100 except TRUNCATE which will get ID 100.
+    // This enesures variable length of event ID in the incremental dump
+    BehaviourInjection<NotificationEventResponse,NotificationEventResponse> eventIdModifier
+            = new BehaviourInjection<NotificationEventResponse,NotificationEventResponse>(){
+      private long nextEventId = 0; // Initialize to 0 as for increment dump, 0 won't be used.
+
+      @Nullable
+      @Override
+      public NotificationEventResponse apply(@Nullable NotificationEventResponse eventIdList) {
+        if (null != eventIdList) {
+          List<NotificationEvent> eventIds = eventIdList.getEvents();
+          List<NotificationEvent> outEventIds = new ArrayList<NotificationEvent>();
+          for (int i = 0; i < eventIds.size(); i++) {
+            NotificationEvent event = eventIds.get(i);
+
+            // Skip all the events belong to other DBs/tables.
+            if (event.getDbName().equalsIgnoreCase(dbName)) {
+              // We will encounter create_table, truncate followed by insert.
+              // For the insert, set the event ID longer such that old comparator picks insert before truncate
+              // Eg: Event IDs CREATE_TABLE - 5, TRUNCATE - 9, INSERT - 12 changed to
+              // CREATE_TABLE - 5, TRUNCATE - 9, INSERT - 100
+              // But if TRUNCATE have ID-10, then having INSERT-100 won't be sufficient to test the scenario.
+              // So, we set any event comes after CREATE_TABLE starts with 20.
+              // Eg: Event IDs CREATE_TABLE - 5, TRUNCATE - 10, INSERT - 12 changed to
+              // CREATE_TABLE - 5, TRUNCATE - 20(20 <= Id < 100), INSERT - 100
+              switch (event.getEventType()) {
+                case "CREATE_TABLE": {
+                  // The next ID is set to 20 or 200 or 2000 ... based on length of current event ID
+                  // This is done to ensure TRUNCATE doesn't get an ID 10 or 100...
+                  nextEventId = (long) Math.pow(10.0, (double) String.valueOf(event.getEventId()).length()) * 2;
+                  break;
+                }
+                case "INSERT": {
+                  // INSERT will come always after CREATE_TABLE, TRUNCATE. So, no need to validate nextEventId
+                  nextEventId = (long) Math.pow(10.0, (double) String.valueOf(nextEventId).length());
+                  LOG.info("Changed EventId #{} to #{}", event.getEventId(), nextEventId);
+                  event.setEventId(nextEventId++);
+                  break;
+                }
+                default: {
+                  // After CREATE_TABLE all the events in this DB should get an ID >= 20 or 200 ...
+                  if (nextEventId > 0) {
+                    LOG.info("Changed EventId #{} to #{}", event.getEventId(), nextEventId);
+                    event.setEventId(nextEventId++);
+                  }
+                  break;
+                }
+              }
+
+              outEventIds.add(event);
+            }
+          }
+          injectionPathCalled = true;
+          if (outEventIds.isEmpty()) {
+            return eventIdList; // If not even one event belongs to current DB, then return original one itself.
+          } else {
+            // If the new list is not empty (input list have some events from this DB), then return it
+            return new NotificationEventResponse(outEventIds);
+          }
+        } else {
+          return null;
+        }
+      }
+    };
+    InjectableBehaviourObjectStore.setGetNextNotificationBehaviour(eventIdModifier);
+
+    // It is possible that currentNotificationEventID from metastore is less than newly set event ID by stub function.
+    // In this case, REPL DUMP will skip events beyond this upper limit.
+    // So, to avoid this failure, we will set the TO clause to ID 100 times of currentNotificationEventID
+    String cmd = "REPL DUMP " + dbName + " FROM " + replDumpId
+               + " TO " + String.valueOf(metaStoreClient.getCurrentNotificationEventId().getEventId()*100);
+
+    advanceDumpDir();
+    run(cmd);
+    eventIdModifier.assertInjectionsPerformed(true,false);
+    InjectableBehaviourObjectStore.resetGetNextNotificationBehaviour(); // reset the behaviour
+
+    String incrementalDumpLocn = getResult(0, 0);
+    String incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    run("EXPLAIN REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    printOutput();
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.unptned ORDER BY a", unptn_data);
+  }
+
+  @Test
   public void testDrops() throws IOException {
 
     String name = testName.getMethodName();
@@ -599,30 +780,14 @@ public class TestReplicationScenarios {
     // not existing, and thus, throwing a NoSuchObjectException, or returning nulls
     // or select * returning empty, depending on what we're testing.
 
-    Exception e = null;
-    try {
-      Table tbl = metaStoreClient.getTable(dbName + "_dupe", "unptned");
-      assertNull(tbl);
-    } catch (TException te) {
-      e = te;
-    }
-    assertNotNull(e);
-    assertEquals(NoSuchObjectException.class, e.getClass());
+    verifyIfTableNotExist(dbName + "_dupe", "unptned");
 
     verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b='2'", empty);
     verifyRun("SELECT a from " + dbName + "_dupe.ptned", ptn_data_1);
     verifyRun("SELECT a from " + dbName + "_dupe.ptned3 WHERE b=1", empty);
     verifyRun("SELECT a from " + dbName + "_dupe.ptned3", ptn_data_2);
 
-    Exception e2 = null;
-    try {
-      Table tbl = metaStoreClient.getTable(dbName+"_dupe","ptned2");
-      assertNull(tbl);
-    } catch (TException te) {
-      e2 = te;
-    }
-    assertNotNull(e2);
-    assertEquals(NoSuchObjectException.class, e.getClass());
+    verifyIfTableNotExist(dbName + "_dupe", "ptned2");
   }
 
   @Test
@@ -732,15 +897,7 @@ public class TestReplicationScenarios {
     run("SELECT a from " + dbName + "_dupe.ptned");
     verifyResults(ptn_data_1);
 
-    Exception e2 = null;
-    try {
-      Table tbl = metaStoreClient.getTable(dbName+"_dupe","ptned2");
-      assertNull(tbl);
-    } catch (TException te) {
-      e2 = te;
-    }
-    assertNotNull(e2);
-    assertEquals(NoSuchObjectException.class, e.getClass());
+    verifyIfTableNotExist(dbName +"_dupe", "ptned2");
 
     run("SELECT a from " + dbName + "_dupe.unptned_copy");
     verifyResults(unptn_data);
@@ -874,15 +1031,7 @@ public class TestReplicationScenarios {
     // Replication done, we now do the following verifications:
 
     // verify that unpartitioned table rename succeeded.
-    Exception e = null;
-    try {
-      Table tbl = metaStoreClient.getTable(dbName + "_dupe" , "unptned");
-      assertNull(tbl);
-    } catch (TException te) {
-      e = te;
-    }
-    assertNotNull(e);
-    assertEquals(NoSuchObjectException.class, e.getClass());
+    verifyIfTableNotExist(dbName + "_dupe", "unptned");
     verifyRun("SELECT * from " + dbName + "_dupe.unptned_rn", unptn_data);
 
     // verify that partition rename succeded.
@@ -898,15 +1047,7 @@ public class TestReplicationScenarios {
     verifyRun("SELECT a from " + dbName + "_dupe.ptned WHERE b=22", ptn_data_2);
 
     // verify that ptned table rename succeded.
-    Exception e2 = null;
-    try {
-      Table tbl = metaStoreClient.getTable(dbName + "_dupe" , "ptned2");
-      assertNull(tbl);
-    } catch (TException te) {
-      e2 = te;
-    }
-    assertNotNull(e2);
-    assertEquals(NoSuchObjectException.class, e.getClass());
+    verifyIfTableNotExist(dbName + "_dupe", "ptned2");
     verifyRun("SELECT a from " + dbName + "_dupe.ptned2_rn WHERE b=2", ptn_data_2);
 
     // verify that ptned table property set worked
@@ -1246,6 +1387,242 @@ public class TestReplicationScenarios {
 
     verifySetup("SELECT name from " + dbName + "_dupe.namelist where (year=1990 and month=5 and day=25)", data_after_ovwrite);
     verifySetup("SELECT name from " + dbName + "_dupe.namelist ORDER BY name", ptn_data_3);
+  }
+
+  @Test
+  public void testIncrementalInsertDropUnpartitionedTable() throws IOException {
+    String testName = "incrementalInsertDropUnpartitionedTable";
+    String dbName = createDB(testName);
+    run("CREATE TABLE " + dbName + ".unptned(a string) STORED AS TEXTFILE");
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName);
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    String[] unptn_data = new String[] { "eleven", "twelve" };
+
+    run("INSERT INTO TABLE " + dbName + ".unptned values('" + unptn_data[0] + "')");
+    run("INSERT INTO TABLE " + dbName + ".unptned values('" + unptn_data[1] + "')");
+    verifySetup("SELECT a from " + dbName + ".unptned ORDER BY a", unptn_data);
+
+    run("CREATE TABLE " + dbName + ".unptned_tmp AS SELECT * FROM " + dbName + ".unptned");
+    verifySetup("SELECT a from " + dbName + ".unptned_tmp ORDER BY a", unptn_data);
+
+    // Get the last repl ID corresponding to all insert/alter/create events except DROP.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    String lastDumpIdWithoutDrop = getResult(0, 1);
+
+    // Drop all the tables
+    run("DROP TABLE " + dbName + ".unptned");
+    run("DROP TABLE " + dbName + ".unptned_tmp");
+    verifyFail("SELECT * FROM " + dbName + ".unptned");
+    verifyFail("SELECT * FROM " + dbName + ".unptned_tmp");
+
+    // Dump all the events except DROP
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId + " TO " + lastDumpIdWithoutDrop);
+    String incrementalDumpLocn = getResult(0, 0);
+    String incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    // Need to find the tables and data as drop is not part of this dump
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.unptned ORDER BY a", unptn_data);
+    verifyRun("SELECT a from " + dbName + "_dupe.unptned_tmp ORDER BY a", unptn_data);
+
+    // Dump the drop events and check if tables are getting dropped in target as well
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    incrementalDumpLocn = getResult(0, 0);
+    incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyFail("SELECT * FROM " + dbName + ".unptned");
+    verifyFail("SELECT * FROM " + dbName + ".unptned_tmp");
+  }
+
+  @Test
+  public void testIncrementalInsertDropPartitionedTable() throws IOException {
+    String testName = "incrementalInsertDropPartitionedTable";
+    String dbName = createDB(testName);
+    run("CREATE TABLE " + dbName + ".ptned(a string) PARTITIONED BY (b int) STORED AS TEXTFILE");
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName);
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    String[] ptn_data_1 = new String[] { "fifteen", "fourteen", "thirteen" };
+    String[] ptn_data_2 = new String[] { "fifteen", "seventeen", "sixteen" };
+
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=1) values('" + ptn_data_1[0] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=1) values('" + ptn_data_1[1] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=1) values('" + ptn_data_1[2] + "')");
+
+    run("ALTER TABLE " + dbName + ".ptned ADD PARTITION (b=20)");
+    run("ALTER TABLE " + dbName + ".ptned RENAME PARTITION (b=20) TO PARTITION (b=2");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=2) values('" + ptn_data_2[0] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=2) values('" + ptn_data_2[1] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=2) values('" + ptn_data_2[2] + "')");
+    verifySetup("SELECT a from " + dbName + ".ptned where (b=1) ORDER BY a", ptn_data_1);
+    verifySetup("SELECT a from " + dbName + ".ptned where (b=2) ORDER BY a", ptn_data_2);
+
+    run("CREATE TABLE " + dbName + ".ptned_tmp AS SELECT * FROM " + dbName + ".ptned");
+    verifySetup("SELECT a from " + dbName + ".ptned_tmp where (b=1) ORDER BY a", ptn_data_1);
+    verifySetup("SELECT a from " + dbName + ".ptned_tmp where (b=2) ORDER BY a", ptn_data_2);
+
+    // Get the last repl ID corresponding to all insert/alter/create events except DROP.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    String lastDumpIdWithoutDrop = getResult(0, 1);
+
+    // Drop all the tables
+    run("DROP TABLE " + dbName + ".ptned_tmp");
+    run("DROP TABLE " + dbName + ".ptned");
+    verifyFail("SELECT * FROM " + dbName + ".ptned_tmp");
+    verifyFail("SELECT * FROM " + dbName + ".ptned");
+
+    // Dump all the events except DROP
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId + " TO " + lastDumpIdWithoutDrop);
+    String incrementalDumpLocn = getResult(0, 0);
+    String incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    // Need to find the tables and data as drop is not part of this dump
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=1) ORDER BY a", ptn_data_1);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=2) ORDER BY a", ptn_data_2);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned_tmp where (b=1) ORDER BY a", ptn_data_1);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned_tmp where (b=2) ORDER BY a", ptn_data_2);
+
+    // Dump the drop events and check if tables are getting dropped in target as well
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    incrementalDumpLocn = getResult(0, 0);
+    incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyFail("SELECT * FROM " + dbName + ".ptned_tmp");
+    verifyFail("SELECT * FROM " + dbName + ".ptned");
+  }
+
+  @Test
+  public void testInsertOverwriteOnUnpartitionedTableWithCM() throws IOException {
+    String testName = "insertOverwriteOnUnpartitionedTableWithCM";
+    LOG.info("Testing " + testName);
+    String dbName = testName + "_" + tid;
+
+    run("CREATE DATABASE " + dbName);
+    run("CREATE TABLE " + dbName + ".unptned(a string) STORED AS TEXTFILE");
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName);
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    // After INSERT INTO operation, get the last Repl ID
+    String[] unptn_data = new String[] { "thirteen" };
+    run("INSERT INTO TABLE " + dbName + ".unptned values('" + unptn_data[0] + "')");
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    String insertDumpId = getResult(0, 1, false);
+
+    // Insert overwrite on unpartitioned table
+    String[] data_after_ovwrite = new String[] { "hundred" };
+    run("INSERT OVERWRITE TABLE " + dbName + ".unptned values('" + data_after_ovwrite[0] + "')");
+
+    // Dump only one INSERT INTO operation on the table.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId + " TO " + insertDumpId);
+    String incrementalDumpLocn = getResult(0, 0);
+    String incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    // After Load from this dump, all target tables/partitions will have initial set of data but source will have latest data.
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.unptned ORDER BY a", unptn_data);
+
+    // Dump the remaining INSERT OVERWRITE operations on the table.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    incrementalDumpLocn = getResult(0, 0);
+    incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+
+    // After load, shall see the overwritten data.
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.unptned ORDER BY a", data_after_ovwrite);
+  }
+
+  @Test
+  public void testInsertOverwriteOnPartitionedTableWithCM() throws IOException {
+    String testName = "insertOverwriteOnPartitionedTableWithCM";
+    LOG.info("Testing " + testName);
+    String dbName = testName + "_" + tid;
+
+    run("CREATE DATABASE " + dbName);
+    run("CREATE TABLE " + dbName + ".ptned(a string) partitioned by (b int) STORED AS TEXTFILE");
+
+    advanceDumpDir();
+    run("REPL DUMP " + dbName);
+    String replDumpLocn = getResult(0, 0);
+    String replDumpId = getResult(0, 1, true);
+    LOG.info("Bootstrap-Dump: Dumped to {} with id {}", replDumpLocn, replDumpId);
+    run("REPL LOAD " + dbName + "_dupe FROM '" + replDumpLocn + "'");
+
+    // INSERT INTO 2 partitions and get the last repl ID
+    String[] ptn_data_1 = new String[] { "fourteen" };
+    String[] ptn_data_2 = new String[] { "fifteen", "sixteen" };
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=1) values('" + ptn_data_1[0] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=2) values('" + ptn_data_2[0] + "')");
+    run("INSERT INTO TABLE " + dbName + ".ptned partition(b=2) values('" + ptn_data_2[1] + "')");
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    String insertDumpId = getResult(0, 1, false);
+
+    // Insert overwrite on one partition with multiple files
+    String[] data_after_ovwrite = new String[] { "hundred" };
+    run("INSERT OVERWRITE TABLE " + dbName + ".ptned partition(b=2) values('" + data_after_ovwrite[0] + "')");
+    verifySetup("SELECT a from " + dbName + ".ptned where (b=2)", data_after_ovwrite);
+
+    // Dump only 2 INSERT INTO operations.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId + " TO " + insertDumpId);
+    String incrementalDumpLocn = getResult(0, 0);
+    String incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+    replDumpId = incrementalDumpId;
+
+    // After Load from this dump, all target tables/partitions will have initial set of data.
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=1) ORDER BY a", ptn_data_1);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=2) ORDER BY a", ptn_data_2);
+
+    // Dump the remaining INSERT OVERWRITE operation on the table.
+    advanceDumpDir();
+    run("REPL DUMP " + dbName + " FROM " + replDumpId);
+    incrementalDumpLocn = getResult(0, 0);
+    incrementalDumpId = getResult(0, 1, true);
+    LOG.info("Incremental-Dump: Dumped to {} with id {} from {}", incrementalDumpLocn, incrementalDumpId, replDumpId);
+
+    // After load, shall see the overwritten data.
+    run("REPL LOAD " + dbName + "_dupe FROM '" + incrementalDumpLocn + "'");
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=1) ORDER BY a", ptn_data_1);
+    verifyRun("SELECT a from " + dbName + "_dupe.ptned where (b=2) ORDER BY a", data_after_ovwrite);
   }
 
   @Test
@@ -1967,6 +2344,50 @@ public class TestReplicationScenarios {
   private void printOutput() throws IOException {
     for (String s : getOutput()){
       LOG.info(s);
+    }
+  }
+
+  private void verifyIfTableNotExist(String dbName, String tableName){
+    Exception e = null;
+    try {
+      Table tbl = metaStoreClient.getTable(dbName, tableName);
+      assertNull(tbl);
+    } catch (TException te) {
+      e = te;
+    }
+    assertNotNull(e);
+    assertEquals(NoSuchObjectException.class, e.getClass());
+  }
+
+  private void verifyIfTableExist(String dbName, String tableName){
+    Exception e = null;
+    try {
+      Table tbl = metaStoreClient.getTable(dbName, tableName);
+      assertNotNull(tbl);
+    } catch (TException te) {
+      assert(false);
+    }
+  }
+
+  private void verifyIfPartitionNotExist(String dbName, String tableName, List<String> partValues){
+    Exception e = null;
+    try {
+      Partition ptn = metaStoreClient.getPartition(dbName, tableName, partValues);
+      assertNull(ptn);
+    } catch (TException te) {
+      e = te;
+    }
+    assertNotNull(e);
+    assertEquals(NoSuchObjectException.class, e.getClass());
+  }
+
+  private void verifyIfPartitionExist(String dbName, String tableName, List<String> partValues){
+    Exception e = null;
+    try {
+      Partition ptn = metaStoreClient.getPartition(dbName, tableName, partValues);
+      assertNotNull(ptn);
+    } catch (TException te) {
+      assert(false);
     }
   }
 

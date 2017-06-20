@@ -73,7 +73,9 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.ErrorMsg;
@@ -1617,6 +1619,9 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           throw new SemanticException(generateErrorMessage(ast,
               ErrorMsg.CLUSTERBY_ORDERBY_CONFLICT.getMsg()));
         }
+        // If there are aggregations in order by, we need to remember them in qb.
+        qbp.addAggregationExprsForClause(ctx_1.dest,
+            doPhase1GetAggregationsFromSelect(ast, qb, ctx_1.dest));
         break;
 
       case HiveParser.TOK_GROUPBY:
@@ -1983,7 +1988,12 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       String tabName = qb.getTabNameForAlias(alias);
       String cteName = tabName.toLowerCase();
 
-      Table tab = db.getTable(tabName, false);
+      // Get table details from tabNameToTabObject cache
+      Table tab = getTableObjectByName(tabName, false);
+      if (tab != null) {
+        // do a deep copy, in case downstream changes it.
+        tab = new Table(tab.getTTable().deepCopy());
+      }
       if (tab == null ||
               tab.getDbName().equals(SessionState.get().getCurrentDatabase())) {
         Table materializedTab = ctx.getMaterializedTable(cteName);
@@ -9024,8 +9034,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   /** Parses semjoin hints in the query and returns the table names mapped to filter size, or -1 if not specified.
    *  Hints can be in 2 formats
-   *  1. TableName, ColumnName, bloom filter entries
-   *  2. TableName, ColumnName
+   *  1. TableName, ColumnName, Target-TableName, bloom filter entries
+   *  2. TableName, ColumnName, Target-TableName
    *  */
   private Map<String, List<SemiJoinHint>> parseSemiJoinHint(List<ASTNode> hints) throws SemanticException {
     if (hints == null || hints.size() == 0) return null;
@@ -9061,15 +9071,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     throws SemanticException {
     // Check if there are enough entries in the tree to constitute a hint.
     int numEntriesLeft = args.getChildCount() - curIdx;
-    if (numEntriesLeft < 2) {
+    if (numEntriesLeft < 3) {
       throw new SemanticException("User provided only 1 entry for the hint with alias "
               + args.getChild(curIdx).getText());
     }
 
-    String alias = args.getChild(curIdx++).getText();
+    String source = args.getChild(curIdx++).getText();
     // validate
-    if (StringUtils.isNumeric(alias)) {
-      throw new SemanticException("User provided bloom filter entries when alias is expected");
+    if (StringUtils.isNumeric(source)) {
+      throw new SemanticException("User provided bloom filter entries when source alias is expected");
     }
 
     String colName = args.getChild(curIdx++).getText();
@@ -9078,8 +9088,14 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException("User provided bloom filter entries when column name is expected");
     }
 
+    String target = args.getChild(curIdx++).getText();
+    // validate
+    if (StringUtils.isNumeric(colName)) {
+      throw new SemanticException("User provided bloom filter entries when target alias is expected");
+    }
+
     Integer number = null;
-    if (numEntriesLeft > 2) {
+    if (numEntriesLeft > 3) {
       // Check if there exists bloom filter size entry
       try {
         number = Integer.parseInt(args.getChild(curIdx).getText());
@@ -9087,7 +9103,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       } catch (NumberFormatException e) { // Ignore
       }
     }
-    result.computeIfAbsent(alias, value -> new ArrayList<>()).add(new SemiJoinHint(colName, number));
+    result.computeIfAbsent(source, value -> new ArrayList<>()).add(new SemiJoinHint(colName, target, number));
     return curIdx;
   }
 
@@ -10919,14 +10935,20 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
   }
 
-  private Table getTableObjectByName(String tableName) throws HiveException {
+  private Table getTableObjectByName(String tableName, boolean throwException) throws HiveException {
     if (!tabNameToTabObject.containsKey(tableName)) {
-      Table table = db.getTable(tableName);
-      tabNameToTabObject.put(tableName, table);
+      Table table = db.getTable(tableName, throwException);
+      if (table != null) {
+        tabNameToTabObject.put(tableName, table);
+      }
       return table;
     } else {
       return tabNameToTabObject.get(tableName);
     }
+  }
+
+  private Table getTableObjectByName(String tableName) throws HiveException {
+    return getTableObjectByName(tableName, true);
   }
 
   private void walkASTMarkTABREF(ASTNode ast, Set<String> cteAlias)
@@ -10938,7 +10960,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       ASTNode astNode = (ASTNode) queue.poll();
       if (astNode.getToken().getType() == HiveParser.TOK_TABREF) {
         int aliasIndex = 0;
-        StringBuffer additionalTabInfo = new StringBuffer();
+        StringBuilder additionalTabInfo = new StringBuilder();
         for (int index = 1; index < astNode.getChildCount(); index++) {
           ASTNode ct = (ASTNode) astNode.getChild(index);
           if (ct.getToken().getType() == HiveParser.TOK_TABLEBUCKETSAMPLE
@@ -11958,6 +11980,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     List<String> bucketCols = new ArrayList<String>();
     List<SQLPrimaryKey> primaryKeys = new ArrayList<SQLPrimaryKey>();
     List<SQLForeignKey> foreignKeys = new ArrayList<SQLForeignKey>();
+    List<SQLUniqueConstraint> uniqueConstraints = new ArrayList<>();
+    List<SQLNotNullConstraint> notNullConstraints = new ArrayList<>();
     List<Order> sortCols = new ArrayList<Order>();
     int numBuckets = -1;
     String comment = null;
@@ -12050,7 +12074,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
         selectStmt = child;
         break;
       case HiveParser.TOK_TABCOLLIST:
-        cols = getColumns(child, true, primaryKeys, foreignKeys);
+        cols = getColumns(child, true, primaryKeys, foreignKeys,
+            uniqueConstraints, notNullConstraints);
         break;
       case HiveParser.TOK_TABLECOMMENT:
         comment = unescapeSQLString(child.getChild(0).getText());
@@ -12164,7 +12189,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           comment,
           storageFormat.getInputFormat(), storageFormat.getOutputFormat(), location, storageFormat.getSerde(),
           storageFormat.getStorageHandler(), storageFormat.getSerdeProps(), tblProps, ifNotExists, skewedColNames,
-          skewedValues, primaryKeys, foreignKeys);
+          skewedValues, primaryKeys, foreignKeys, uniqueConstraints, notNullConstraints);
       crtTblDesc.setStoredAsSubDirectories(storedAsDirs);
       crtTblDesc.setNullFormat(rowFormatParams.nullFormat);
 
@@ -12261,7 +12286,8 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           rowFormatParams.lineDelim, comment, storageFormat.getInputFormat(),
           storageFormat.getOutputFormat(), location, storageFormat.getSerde(),
           storageFormat.getStorageHandler(), storageFormat.getSerdeProps(), tblProps, ifNotExists,
-	  skewedColNames, skewedValues, true, primaryKeys, foreignKeys);
+	        skewedColNames, skewedValues, true, primaryKeys, foreignKeys,
+	        uniqueConstraints, notNullConstraints);
       tableDesc.setMaterialization(isMaterialization);
       tableDesc.setStoredAsSubDirectories(storedAsDirs);
       tableDesc.setNullFormat(rowFormatParams.nullFormat);
@@ -12543,41 +12569,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
           }
         }
 
-        // replace each of the position alias in ORDERBY with the actual column name
-        if (orderbyNode != null) {
-          isAllCol = false;
-          for (int child_pos = 0; child_pos < selectNode.getChildCount(); ++child_pos) {
-            ASTNode node = (ASTNode) selectNode.getChild(child_pos).getChild(0);
-            if (node != null && node.getToken().getType() == HiveParser.TOK_ALLCOLREF) {
-              isAllCol = true;
-            }
-          }
-          for (int child_pos = 0; child_pos < orderbyNode.getChildCount(); ++child_pos) {
-            ASTNode colNode = (ASTNode) orderbyNode.getChild(child_pos).getChild(0);
-            ASTNode node = (ASTNode) colNode.getChild(0);
-            if (node != null && node.getToken().getType() == HiveParser.Number) {
-              if (isObyByPos) {
-                if (!isAllCol) {
-                  int pos = Integer.parseInt(node.getText());
-                  if (pos > 0 && pos <= selectExpCnt) {
-                    colNode.setChild(0, selectNode.getChild(pos - 1).getChild(0));
-                  } else {
-                    throw new SemanticException(
-                      ErrorMsg.INVALID_POSITION_ALIAS_IN_ORDERBY.getMsg(
-                      "Position alias: " + pos + " does not exist\n" +
-                      "The Select List is indexed from 1 to " + selectExpCnt));
-                  }
-                } else {
-                  throw new SemanticException(
-                    ErrorMsg.NO_SUPPORTED_ORDERBY_ALLCOLREF_POS.getMsg());
-                }
-              } else { //if not using position alias and it is a number.
-                warn("Using constant number " + node.getText() +
-                  " in order by. If you try to use position alias when hive.orderby.position.alias is false, the position alias will be ignored.");
-              }
-            }
-          }
-        }
+        // orderby position will be processed in genPlan
       }
 
       for (int i = next.getChildren().size() - 1; i >= 0; i--) {

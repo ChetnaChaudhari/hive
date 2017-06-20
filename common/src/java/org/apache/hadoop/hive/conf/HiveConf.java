@@ -449,6 +449,8 @@ public class HiveConf extends Configuration {
     REPLCMINTERVAL("hive.repl.cm.interval","3600s",
         new TimeValidator(TimeUnit.SECONDS),
         "Inteval for cmroot cleanup thread."),
+    REPL_FUNCTIONS_ROOT_DIR("hive.repl.replica.functions.root.dir","/user/hive/repl/functions/",
+        "Root directory on the replica warehouse where the repl sub-system will store jars from the primary warehouse"),
     LOCALSCRATCHDIR("hive.exec.local.scratchdir",
         "${system:java.io.tmpdir}" + File.separator + "${system:user.name}",
         "Local scratch space for Hive jobs"),
@@ -777,6 +779,11 @@ public class HiveConf extends Configuration {
     METASTORE_SCHEMA_VERIFICATION_RECORD_VERSION("hive.metastore.schema.verification.record.version", false,
       "When true the current MS version is recorded in the VERSION table. If this is disabled and verification is\n" +
       " enabled the MS will be unusable."),
+    METASTORE_SCHEMA_INFO_CLASS("hive.metastore.schema.info.class",
+        "org.apache.hadoop.hive.metastore.MetaStoreSchemaInfo",
+        "Fully qualified class name for the metastore schema information class \n"
+        + "which is used by schematool to fetch the schema information.\n"
+        + " This class should implement the IMetaStoreSchemaInfo interface"),
     METASTORE_TRANSACTION_ISOLATION("datanucleus.transactionIsolation", "read-committed",
         "Default transaction isolation level for identity generation."),
     METASTORE_CACHE_LEVEL2("datanucleus.cache.level2", false,
@@ -1562,6 +1569,8 @@ public class HiveConf extends Configuration {
          "Whether to transform OR clauses in Filter operators into IN clauses"),
     HIVEPOINTLOOKUPOPTIMIZERMIN("hive.optimize.point.lookup.min", 31,
              "Minimum number of OR clauses needed to transform into IN clauses"),
+    HIVECOUNTDISTINCTOPTIMIZER("hive.optimize.countdistinct", true,
+                 "Whether to transform count distinct into two stages"),
    HIVEPARTITIONCOLUMNSEPARATOR("hive.optimize.partition.columns.separate", true,
             "Extract partition columns from IN clauses"),
     // Constant propagation optimizer
@@ -2606,6 +2615,10 @@ public class HiveConf extends Configuration {
     HIVE_SERVER2_ENABLE_DOAS("hive.server2.enable.doAs", true,
         "Setting this property to true will have HiveServer2 execute\n" +
         "Hive operations as the user making the calls to it."),
+    HIVE_DISTCP_DOAS_USER("hive.distcp.privileged.doAs","hdfs",
+        "This property allows privileged distcp executions done by hive\n" +
+        "to run as this user. Typically, it should be the user you\n" +
+        "run the namenode as, such as the 'hdfs' user."),
     HIVE_SERVER2_TABLE_TYPE_MAPPING("hive.server2.table.type.mapping", "CLASSIC", new StringSet("CLASSIC", "HIVE"),
         "This setting reflects how HiveServer2 will report the table types for JDBC and other\n" +
         "client implementations that retrieve the available tables and supported table types\n" +
@@ -3358,6 +3371,8 @@ public class HiveConf extends Configuration {
             "Turn this off when there is a memory issue."),
     SPARK_JOB_MAX_TASKS("hive.spark.job.max.tasks", -1, "The maximum number of tasks a Spark job may have.\n" +
             "If a Spark job contains more tasks than the maximum, it will be cancelled. A value of -1 means no limit."),
+    SPARK_STAGE_MAX_TASKS("hive.spark.stage.max.tasks", -1, "The maximum number of tasks a stage in a Spark job may have.\n" +
+        "If a Spark job stage contains more tasks than the maximum, the job will be cancelled. A value of -1 means no limit."),
     NWAYJOINREORDER("hive.reorder.nway.joins", true,
       "Runs reordering of tables within single n-way join (i.e.: picks streamtable)"),
     HIVE_MERGE_NWAY_JOINS("hive.merge.nway.joins", true,
@@ -3396,6 +3411,7 @@ public class HiveConf extends Configuration {
         "hive.security.authenticator.manager,hive.security.authorization.manager," +
         "hive.security.metastore.authorization.manager,hive.security.metastore.authenticator.manager," +
         "hive.users.in.admin.role,hive.server2.xsrf.filter.enabled,hive.security.authorization.enabled," +
+            "hive.distcp.privileged.doAs," +
             "hive.server2.authentication.ldap.baseDN," +
             "hive.server2.authentication.ldap.url," +
             "hive.server2.authentication.ldap.Domain," +
@@ -3406,7 +3422,15 @@ public class HiveConf extends Configuration {
             "hive.server2.authentication.ldap.groupMembershipKey," +
             "hive.server2.authentication.ldap.userMembershipKey," +
             "hive.server2.authentication.ldap.groupClassKey," +
-            "hive.server2.authentication.ldap.customLDAPQuery",
+            "hive.server2.authentication.ldap.customLDAPQuery," +
+            "hive.spark.client.connect.timeout," +
+            "hive.spark.client.server.connect.timeout," +
+            "hive.spark.client.channel.log.level," +
+            "hive.spark.client.rpc.max.size," +
+            "hive.spark.client.rpc.threads," +
+            "hive.spark.client.secret.bits," +
+            "hive.spark.client.rpc.server.address," +
+            "hive.spark.client.rpc.server.port",
         "Comma separated list of configuration options which are immutable at runtime"),
     HIVE_CONF_HIDDEN_LIST("hive.conf.hidden.list",
         METASTOREPWD.varname + "," + HIVE_SERVER2_SSL_KEYSTORE_PASSWORD.varname

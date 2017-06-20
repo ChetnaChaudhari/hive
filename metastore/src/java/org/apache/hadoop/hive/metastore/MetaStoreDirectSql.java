@@ -28,6 +28,7 @@ import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -56,7 +57,9 @@ import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -349,13 +352,13 @@ class MetaStoreDirectSql {
   public List<Partition> getPartitionsViaSqlFilter(final String dbName, final String tblName,
       List<String> partNames) throws MetaException {
     if (partNames.isEmpty()) {
-      return new ArrayList<Partition>();
+      return Collections.emptyList();
     }
     return runBatched(partNames, new Batchable<String, Partition>() {
       public List<Partition> run(List<String> input) throws MetaException {
         String filter = "\"PARTITIONS\".\"PART_NAME\" in (" + makeParams(input.size()) + ")";
         return getPartitionsViaSqlFilterInternal(dbName, tblName, null, filter, input,
-            new ArrayList<String>(), null);
+            Collections.emptyList(), null);
       }
     });
   }
@@ -400,7 +403,7 @@ class MetaStoreDirectSql {
   public List<Partition> getPartitions(
       String dbName, String tblName, Integer max) throws MetaException {
     return getPartitionsViaSqlFilterInternal(dbName, tblName, null,
-        null, new ArrayList<String>(), new ArrayList<String>(), max);
+        null, Collections.emptyList(), Collections.emptyList(), max);
   }
 
   private static Boolean isViewTable(Table t) {
@@ -480,7 +483,7 @@ class MetaStoreDirectSql {
     long queryTime = doTrace ? System.nanoTime() : 0;
     timingTrace(doTrace, queryText, start, queryTime);
     if (sqlResult.isEmpty()) {
-      return new ArrayList<Partition>(); // no partitions, bail early.
+      return Collections.emptyList(); // no partitions, bail early.
     }
 
     // Get full objects. For Oracle/etc. do it in batches.
@@ -724,7 +727,7 @@ class MetaStoreDirectSql {
           if (fields[1] == null) {
             currentList = null; // left outer join produced a list with no values
             currentListId = null;
-            t.getSkewedInfo().addToSkewedColValues(new ArrayList<String>());
+            t.getSkewedInfo().addToSkewedColValues(Collections.emptyList());
           } else {
             long fieldsListId = extractSqlLong(fields[1]);
             if (currentListId == null || fieldsListId != currentListId) {
@@ -1222,7 +1225,7 @@ class MetaStoreDirectSql {
       throws MetaException {
     if (colNames.isEmpty() || partNames.isEmpty()) {
       LOG.debug("Columns is empty or partNames is empty : Short-circuiting stats eval");
-      return new AggrStats(new ArrayList<ColumnStatisticsObj>(), 0); // Nothing to aggregate
+      return new AggrStats(Collections.emptyList(), 0); // Nothing to aggregate
     }
     long partsFound = 0;
     List<ColumnStatisticsObj> colStatsList;
@@ -1363,11 +1366,11 @@ class MetaStoreDirectSql {
     query = pm.newQuery("javax.jdo.query.SQL", queryText);
     qResult =
         executeWithArray(query,
-            prepareParams(dbName, tblName, new ArrayList<String>(), new ArrayList<String>()),
+            prepareParams(dbName, tblName, Collections.emptyList(), Collections.emptyList()),
             queryText);
     if (qResult == null) {
       query.closeAll();
-      return Maps.newHashMap();
+      return Collections.emptyMap();
     }
     end = doTrace ? System.nanoTime() : 0;
     timingTrace(doTrace, queryText, start, end);
@@ -1451,7 +1454,7 @@ class MetaStoreDirectSql {
           queryText);
       if (qResult == null) {
         query.closeAll();
-        return Lists.newArrayList();
+        return Collections.emptyList();
       }
       end = doTrace ? System.nanoTime() : 0;
       timingTrace(doTrace, queryText, start, end);
@@ -1481,7 +1484,7 @@ class MetaStoreDirectSql {
       timingTrace(doTrace, queryText, start, end);
       if (qResult == null) {
         query.closeAll();
-        return Lists.newArrayList();
+        return Collections.emptyList();
       }
       List<String> noExtraColumnNames = new ArrayList<String>();
       Map<String, String[]> extraColumnNameTypeParts = new HashMap<String, String[]>();
@@ -1513,7 +1516,7 @@ class MetaStoreDirectSql {
             prepareParams(dbName, tableName, partNames, noExtraColumnNames), queryText);
         if (qResult == null) {
           query.closeAll();
-          return Lists.newArrayList();
+          return Collections.emptyList();
         }
         list = ensureList(qResult);
         for (Object[] row : list) {
@@ -1546,7 +1549,7 @@ class MetaStoreDirectSql {
             prepareParams(dbName, tableName, partNames, extraColumnNames), queryText);
         if (qResult == null) {
           query.closeAll();
-          return Lists.newArrayList();
+          return Collections.emptyList();
         }
         list = ensureList(qResult);
         // see the indexes for colstats in IExtrapolatePartStatus
@@ -1623,7 +1626,7 @@ class MetaStoreDirectSql {
                   prepareParams(dbName, tableName, partNames, Arrays.asList(colName)), queryText);
               if (qResult == null) {
                 query.closeAll();
-                return Lists.newArrayList();
+                return Collections.emptyList();
               }
               fqr = (ForwardQueryResult) qResult;
               Object[] min = (Object[]) (fqr.get(0));
@@ -1652,7 +1655,7 @@ class MetaStoreDirectSql {
                   prepareParams(dbName, tableName, partNames, Arrays.asList(colName)), queryText);
               if (qResult == null) {
                 query.closeAll();
-                return Lists.newArrayList();
+                return Collections.emptyList();
               }
               fqr = (ForwardQueryResult) qResult;
               Object[] avg = (Object[]) (fqr.get(0));
@@ -1714,7 +1717,7 @@ class MetaStoreDirectSql {
   public List<ColumnStatistics> getPartitionStats(final String dbName, final String tableName,
       final List<String> partNames, List<String> colNames) throws MetaException {
     if (colNames.isEmpty() || partNames.isEmpty()) {
-      return Lists.newArrayList();
+      return Collections.emptyList();
     }
     final boolean doTrace = LOG.isDebugEnabled();
     final String queryText0 = "select \"PARTITION_NAME\", " + STATS_COLLIST + " from "
@@ -1733,7 +1736,7 @@ class MetaStoreDirectSql {
             timingTrace(doTrace, queryText0, start, (doTrace ? System.nanoTime() : 0));
             if (qResult == null) {
               query.closeAll();
-              return Lists.newArrayList();
+              return Collections.emptyList();
             }
             addQueryAfterUse(query);
             return ensureList(qResult);
@@ -1918,9 +1921,6 @@ class MetaStoreDirectSql {
       + (parent_db_name == null ? "" : " \"D2\".\"NAME\" = ?") ;
 
     queryText = queryText.trim();
-    if (queryText.endsWith("WHERE")) {
-      queryText = queryText.substring(0, queryText.length()-5);
-    }
     if (queryText.endsWith("AND")) {
       queryText = queryText.substring(0, queryText.length()-3);
     }
@@ -1986,9 +1986,6 @@ class MetaStoreDirectSql {
       + (tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? ") ;
 
     queryText = queryText.trim();
-    if (queryText.endsWith("WHERE")) {
-      queryText = queryText.substring(0, queryText.length()-5);
-    }
     if (queryText.endsWith("AND")) {
       queryText = queryText.substring(0, queryText.length()-3);
     }
@@ -2019,6 +2016,109 @@ class MetaStoreDirectSql {
           validate,
           rely);
           ret.add(currKey);
+      }
+    }
+    return ret;
+  }
+
+  public List<SQLUniqueConstraint> getUniqueConstraints(String db_name, String tbl_name)
+          throws MetaException {
+    List<SQLUniqueConstraint> ret = new ArrayList<SQLUniqueConstraint>();
+    String queryText =
+      "SELECT \"DBS\".\"NAME\", \"TBLS\".\"TBL_NAME\", \"COLUMNS_V2\".\"COLUMN_NAME\","
+      + "\"KEY_CONSTRAINTS\".\"POSITION\", "
+      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\" "
+      + " FROM  \"TBLS\" "
+      + " INNER  JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
+      + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\" ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" AND "
+      + " \"COLUMNS_V2\".\"INTEGER_IDX\" = \"KEY_CONSTRAINTS\".\"PARENT_INTEGER_IDX\" "
+      + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "+ MConstraint.UNIQUE_CONSTRAINT + " AND "
+      + (db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
+      + (tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? ") ;
+
+    queryText = queryText.trim();
+    if (queryText.endsWith("AND")) {
+      queryText = queryText.substring(0, queryText.length()-3);
+    }
+    List<String> pms = new ArrayList<String>();
+    if (db_name != null) {
+      pms.add(db_name);
+    }
+    if (tbl_name != null) {
+      pms.add(tbl_name);
+    }
+
+    Query queryParams = pm.newQuery("javax.jdo.query.SQL", queryText);
+      List<Object[]> sqlResult = ensureList(executeWithArray(
+        queryParams, pms.toArray(), queryText));
+
+    if (!sqlResult.isEmpty()) {
+      for (Object[] line : sqlResult) {
+          int enableValidateRely = extractSqlInt(line[5]);
+          boolean enable = (enableValidateRely & 4) != 0;
+          boolean validate = (enableValidateRely & 2) != 0;
+          boolean rely = (enableValidateRely & 1) != 0;
+        SQLUniqueConstraint currConstraint = new SQLUniqueConstraint(
+          extractSqlString(line[0]),
+          extractSqlString(line[1]),
+          extractSqlString(line[2]),
+          extractSqlInt(line[3]), extractSqlString(line[4]),
+          enable,
+          validate,
+          rely);
+          ret.add(currConstraint);
+      }
+    }
+    return ret;
+  }
+
+  public List<SQLNotNullConstraint> getNotNullConstraints(String db_name, String tbl_name)
+          throws MetaException {
+    List<SQLNotNullConstraint> ret = new ArrayList<SQLNotNullConstraint>();
+    String queryText =
+      "SELECT \"DBS\".\"NAME\", \"TBLS\".\"TBL_NAME\", \"COLUMNS_V2\".\"COLUMN_NAME\","
+      + "\"KEY_CONSTRAINTS\".\"CONSTRAINT_NAME\", \"KEY_CONSTRAINTS\".\"ENABLE_VALIDATE_RELY\" "
+      + " FROM  \"TBLS\" "
+      + " INNER  JOIN \"KEY_CONSTRAINTS\" ON \"TBLS\".\"TBL_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_TBL_ID\" "
+      + " INNER JOIN \"DBS\" ON \"TBLS\".\"DB_ID\" = \"DBS\".\"DB_ID\" "
+      + " INNER JOIN \"COLUMNS_V2\" ON \"COLUMNS_V2\".\"CD_ID\" = \"KEY_CONSTRAINTS\".\"PARENT_CD_ID\" AND "
+      + " \"COLUMNS_V2\".\"INTEGER_IDX\" = \"KEY_CONSTRAINTS\".\"PARENT_INTEGER_IDX\" "
+      + " WHERE \"KEY_CONSTRAINTS\".\"CONSTRAINT_TYPE\" = "+ MConstraint.NOT_NULL_CONSTRAINT + " AND "
+      + (db_name == null ? "" : "\"DBS\".\"NAME\" = ? AND")
+      + (tbl_name == null ? "" : " \"TBLS\".\"TBL_NAME\" = ? ") ;
+
+    queryText = queryText.trim();
+    if (queryText.endsWith("AND")) {
+      queryText = queryText.substring(0, queryText.length()-3);
+    }
+    List<String> pms = new ArrayList<String>();
+    if (db_name != null) {
+      pms.add(db_name);
+    }
+    if (tbl_name != null) {
+      pms.add(tbl_name);
+    }
+
+    Query queryParams = pm.newQuery("javax.jdo.query.SQL", queryText);
+      List<Object[]> sqlResult = ensureList(executeWithArray(
+        queryParams, pms.toArray(), queryText));
+
+    if (!sqlResult.isEmpty()) {
+      for (Object[] line : sqlResult) {
+          int enableValidateRely = extractSqlInt(line[4]);
+          boolean enable = (enableValidateRely & 4) != 0;
+          boolean validate = (enableValidateRely & 2) != 0;
+          boolean rely = (enableValidateRely & 1) != 0;
+        SQLNotNullConstraint currConstraint = new SQLNotNullConstraint(
+          extractSqlString(line[0]),
+          extractSqlString(line[1]),
+          extractSqlString(line[2]),
+          extractSqlString(line[3]),
+          enable,
+          validate,
+          rely);
+          ret.add(currConstraint);
       }
     }
     return ret;

@@ -219,7 +219,7 @@ public class DbNotificationListener extends MetaStoreEventListener {
         FileStatus file = files[i];
         i++;
         return ReplChangeManager.encodeFileUri(file.getPath().toString(),
-            ReplChangeManager.getChksumString(file.getPath(), fs));
+            ReplChangeManager.checksumFor(file.getPath(), fs));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -437,13 +437,14 @@ public class DbNotificationListener extends MetaStoreEventListener {
   }
   @Override
   public void onInsert(InsertEvent insertEvent) throws MetaException {
+    Table tableObj = insertEvent.getTableObj();
     NotificationEvent event =
-        new NotificationEvent(0, now(), EventType.INSERT.toString(), msgFactory.buildInsertMessage(
-            insertEvent.getDb(), insertEvent.getTable(), insertEvent.getPartitionKeyValues(), insertEvent.isReplace(),
+        new NotificationEvent(0, now(), EventType.INSERT.toString(), msgFactory.buildInsertMessage(tableObj,
+                insertEvent.getPartitionObj(), insertEvent.isReplace(),
             new FileChksumIterator(insertEvent.getFiles(), insertEvent.getFileChecksums()))
-            .toString());
-    event.setDbName(insertEvent.getDb());
-    event.setTableName(insertEvent.getTable());
+                .toString());
+    event.setDbName(tableObj.getDbName());
+    event.setTableName(tableObj.getTableName());
     process(event, insertEvent);
   }
 

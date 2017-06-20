@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -75,7 +75,27 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
       FileSystem srcFs = fromPath.getFileSystem(conf);
       dstFs = toPath.getFileSystem(conf);
 
-      List<FileStatus> srcFiles = new ArrayList<FileStatus>();
+      // This should only be true for copy tasks created from functions, otherwise there should never
+      // be a CM uri in the from path.
+      if (ReplChangeManager.isCMFileUri(fromPath, srcFs)) {
+        String[] result = ReplChangeManager.getFileWithChksumFromURI(fromPath.toString());
+        Path sourcePath = ReplChangeManager
+            .getFileStatus(new Path(result[0]), result[1], conf)
+            .getPath();
+        if (FileUtils.copy(
+            sourcePath.getFileSystem(conf), sourcePath,
+            dstFs, toPath
+            , false, false, conf
+        )) {
+          return 0;
+        } else {
+          console.printError("Failed to copy: '" + fromPath.toString() + "to: '" + toPath.toString()
+              + "'");
+          return 1;
+        }
+      }
+
+      List<FileStatus> srcFiles = new ArrayList<>();
       FileStatus[] srcs = LoadSemanticAnalyzer.matchFilesOrDir(srcFs, fromPath);
       LOG.debug("ReplCopyTasks srcs=" + (srcs == null ? "null" : srcs.length));
       if (! rwork.getReadListFromInput()){
@@ -139,10 +159,7 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
         if (!rwork.getListFilesOnOutputBehaviour(oneSrc)){
 
           LOG.debug("ReplCopyTask :cp:" + oneSrc.getPath() + "=>" + toPath);
-          if (!FileUtils.copy(actualSrcFs, oneSrc.getPath(), dstFs, toPath,
-            false, // delete source
-            true, // overwrite destination
-            conf)) {
+          if (!doCopy(toPath, dstFs, oneSrc.getPath(), actualSrcFs)) {
           console.printError("Failed to copy: '" + oneSrc.getPath().toString()
               + "to: '" + toPath.toString() + "'");
           return 1;
@@ -150,7 +167,7 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
         }else{
           LOG.debug("ReplCopyTask _files now tracks:" + oneSrc.getPath().toUri());
           console.printInfo("Tracking file: " + oneSrc.getPath().toUri());
-          String chksumString = ReplChangeManager.getChksumString(oneSrc.getPath(), actualSrcFs);
+          String chksumString = ReplChangeManager.checksumFor(oneSrc.getPath(), actualSrcFs);
           listBW.write(ReplChangeManager.encodeFileUri
               (oneSrc.getPath().toUri().toString(), chksumString) + "\n");
         }
@@ -166,6 +183,16 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
       console.printError("Failed with exception " + e.getMessage(), "\n"
           + StringUtils.stringifyException(e));
       return (1);
+    }
+  }
+
+  private boolean doCopy(Path dst, FileSystem dstFs, Path src, FileSystem srcFs) throws IOException {
+    if (conf.getBoolVar(HiveConf.ConfVars.HIVE_IN_TEST)){
+      // regular copy in test env.
+      return FileUtils.copy(srcFs, src, dstFs, dst, false, true, conf);
+    } else {
+      // distcp in actual deployment with privilege escalation
+      return FileUtils.privilegedCopy(srcFs, src, dst, conf);
     }
   }
 

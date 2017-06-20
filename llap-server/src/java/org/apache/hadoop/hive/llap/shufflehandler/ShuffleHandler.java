@@ -119,13 +119,15 @@ import org.jboss.netty.util.CharsetUtil;
 import org.jboss.netty.util.HashedWheelTimer;
 import org.jboss.netty.util.Timer;
 
+import io.netty.util.NetUtil;
+
 public class ShuffleHandler implements AttemptRegistrationListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleHandler.class);
 
   public static final String SHUFFLE_HANDLER_LOCAL_DIRS = "llap.shuffle.handler.local-dirs";
 
-  public static final String SHUFFLE_MANAGE_OS_CACHE = "lla[.shuffle.manage.os.cache";
+  public static final String SHUFFLE_MANAGE_OS_CACHE = "llap.shuffle.manage.os.cache";
   public static final boolean DEFAULT_SHUFFLE_MANAGE_OS_CACHE = true;
 
   public static final String SHUFFLE_READAHEAD_BYTES = "llap.shuffle.readahead.bytes";
@@ -327,6 +329,7 @@ public class ShuffleHandler implements AttemptRegistrationListener {
       throw new RuntimeException(ex);
     }
     bootstrap.setPipelineFactory(pipelineFact);
+    bootstrap.setOption("backlog", NetUtil.SOMAXCONN);
     port = conf.getInt(SHUFFLE_PORT_CONFIG_KEY, DEFAULT_SHUFFLE_PORT);
     Channel ch = bootstrap.bind(new InetSocketAddress(port));
     accepted.add(ch);
@@ -336,7 +339,8 @@ public class ShuffleHandler implements AttemptRegistrationListener {
     if (dirWatcher != null) {
       dirWatcher.start();
     }
-    LOG.info("LlapShuffleHandler" + " listening on port " + port);
+    LOG.info("LlapShuffleHandler" + " listening on port " + port + " (SOMAXCONN: " + bootstrap.getOption("backlog")
+      + ")");
   }
 
   public static void initializeAndStart(Configuration conf) throws Exception {
@@ -813,7 +817,7 @@ public class ShuffleHandler implements AttemptRegistrationListener {
     }
 
     private String getErrorMessage(Throwable t) {
-      StringBuffer sb = new StringBuffer(t.getMessage());
+      StringBuilder sb = new StringBuilder(t.getMessage());
       while (t.getCause() != null) {
         sb.append(t.getCause().getMessage());
         t = t.getCause();

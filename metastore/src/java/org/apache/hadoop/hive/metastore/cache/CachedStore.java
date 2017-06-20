@@ -70,7 +70,9 @@ import org.apache.hadoop.hive.metastore.api.PrivilegeBag;
 import org.apache.hadoop.hive.metastore.api.Role;
 import org.apache.hadoop.hive.metastore.api.RolePrincipalGrant;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLNotNullConstraint;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.metastore.api.SQLUniqueConstraint;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
@@ -83,6 +85,7 @@ import org.apache.hadoop.hive.metastore.hbase.stats.merge.ColumnStatsMergerFacto
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hive.common.util.HiveStringUtils;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -114,7 +117,7 @@ public class CachedStore implements RawStore, Configurable {
   private static ReentrantReadWriteLock partitionColStatsCacheLock = new ReentrantReadWriteLock(
       true);
   private static AtomicBoolean isPartitionColStatsCacheDirty = new AtomicBoolean(false);
-  RawStore rawStore;
+  RawStore rawStore = null;
   Configuration conf;
   private PartitionExpressionProxy expressionProxy = null;
   // Default value set to 100 milliseconds for test purpose
@@ -195,11 +198,13 @@ public class CachedStore implements RawStore, Configurable {
   public void setConf(Configuration conf) {
     String rawStoreClassName = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORE_CACHED_RAW_STORE_IMPL,
         ObjectStore.class.getName());
-    try {
-      rawStore = ((Class<? extends RawStore>) MetaStoreUtils.getClass(
-          rawStoreClassName)).newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException("Cannot instantiate " + rawStoreClassName, e);
+    if (rawStore == null) {
+      try {
+        rawStore = ((Class<? extends RawStore>) MetaStoreUtils.getClass(
+            rawStoreClassName)).newInstance();
+      } catch (Exception e) {
+        throw new RuntimeException("Cannot instantiate " + rawStoreClassName, e);
+      }
     }
     rawStore.setConf(conf);
     Configuration oldConf = this.conf;
@@ -328,8 +333,9 @@ public class CachedStore implements RawStore, Configurable {
       String rawStoreClassName =
           HiveConf.getVar(cachedStore.conf, HiveConf.ConfVars.METASTORE_CACHED_RAW_STORE_IMPL,
               ObjectStore.class.getName());
+      RawStore rawStore = null;
       try {
-        RawStore rawStore =
+        rawStore =
             ((Class<? extends RawStore>) MetaStoreUtils.getClass(rawStoreClassName)).newInstance();
         rawStore.setConf(cachedStore.conf);
         List<String> dbNames = rawStore.getAllDatabases();
@@ -350,10 +356,18 @@ public class CachedStore implements RawStore, Configurable {
             }
           }
         }
-      } catch (MetaException e) {
-        LOG.error("Updating CachedStore: error getting database names", e);
       } catch (InstantiationException | IllegalAccessException e) {
         throw new RuntimeException("Cannot instantiate " + rawStoreClassName, e);
+      } catch (Exception e) {
+        LOG.error("Updating CachedStore: error happen when refresh", e);
+      } finally {
+        try {
+          if (rawStore != null) {
+            rawStore.shutdown();
+          }
+        } catch (Exception e) {
+          LOG.error("Error shutting down RawStore", e);
+        }
       }
     }
 
@@ -447,15 +461,17 @@ public class CachedStore implements RawStore, Configurable {
         ColumnStatistics tableColStats =
             rawStore.getTableColumnStatistics(dbName, tblName, colNames);
         Deadline.stopTimer();
-        if (tableColStatsCacheLock.writeLock().tryLock()) {
-          // Skip background updates if we detect change
-          if (isTableColStatsCacheDirty.compareAndSet(true, false)) {
-            LOG.debug("Skipping table column stats cache update; the table column stats list we "
-                + "have is dirty.");
-            return;
+        if (tableColStats != null) {
+          if (tableColStatsCacheLock.writeLock().tryLock()) {
+            // Skip background updates if we detect change
+            if (isTableColStatsCacheDirty.compareAndSet(true, false)) {
+              LOG.debug("Skipping table column stats cache update; the table column stats list we "
+                  + "have is dirty.");
+              return;
+            }
+            SharedCache.refreshTableColStats(HiveStringUtils.normalizeIdentifier(dbName),
+                HiveStringUtils.normalizeIdentifier(tblName), tableColStats.getStatsObj());
           }
-          SharedCache.refreshTableColStats(HiveStringUtils.normalizeIdentifier(dbName),
-              HiveStringUtils.normalizeIdentifier(tblName), tableColStats.getStatsObj());
         }
       } catch (MetaException | NoSuchObjectException e) {
         LOG.info("Updating CachedStore: unable to read table column stats of table: " + tblName, e);
@@ -473,15 +489,17 @@ public class CachedStore implements RawStore, Configurable {
         Map<String, List<ColumnStatisticsObj>> colStatsPerPartition =
             rawStore.getColStatsForTablePartitions(dbName, tblName);
         Deadline.stopTimer();
-        if (partitionColStatsCacheLock.writeLock().tryLock()) {
-          // Skip background updates if we detect change
-          if (isPartitionColStatsCacheDirty.compareAndSet(true, false)) {
-            LOG.debug("Skipping partition column stats cache update; the partition column stats "
-                + "list we have is dirty.");
-            return;
+        if (colStatsPerPartition != null) {
+          if (partitionColStatsCacheLock.writeLock().tryLock()) {
+            // Skip background updates if we detect change
+            if (isPartitionColStatsCacheDirty.compareAndSet(true, false)) {
+              LOG.debug("Skipping partition column stats cache update; the partition column stats "
+                  + "list we have is dirty.");
+              return;
+            }
+            SharedCache.refreshPartitionColStats(HiveStringUtils.normalizeIdentifier(dbName),
+                HiveStringUtils.normalizeIdentifier(tblName), colStatsPerPartition);
           }
-          SharedCache.refreshPartitionColStats(HiveStringUtils.normalizeIdentifier(dbName),
-              HiveStringUtils.normalizeIdentifier(tblName), colStatsPerPartition);
         }
       } catch (MetaException | NoSuchObjectException e) {
         LOG.info("Updating CachedStore: unable to read partitions column stats of table: "
@@ -1846,11 +1864,28 @@ public class CachedStore implements RawStore, Configurable {
   }
 
   @Override
+  public List<SQLUniqueConstraint> getUniqueConstraints(String db_name, String tbl_name)
+      throws MetaException {
+    // TODO constraintCache
+    return rawStore.getUniqueConstraints(db_name, tbl_name);
+  }
+
+  @Override
+  public List<SQLNotNullConstraint> getNotNullConstraints(String db_name, String tbl_name)
+      throws MetaException {
+    // TODO constraintCache
+    return rawStore.getNotNullConstraints(db_name, tbl_name);
+  }
+
+  @Override
   public void createTableWithConstraints(Table tbl,
-      List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
+      List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys,
+      List<SQLUniqueConstraint> uniqueConstraints,
+      List<SQLNotNullConstraint> notNullConstraints)
       throws InvalidObjectException, MetaException {
     // TODO constraintCache
-    rawStore.createTableWithConstraints(tbl, primaryKeys, foreignKeys);
+    rawStore.createTableWithConstraints(tbl, primaryKeys, foreignKeys,
+            uniqueConstraints, notNullConstraints);
     SharedCache.addTableToCache(HiveStringUtils.normalizeIdentifier(tbl.getDbName()),
         HiveStringUtils.normalizeIdentifier(tbl.getTableName()), tbl);
   }
@@ -1874,6 +1909,20 @@ public class CachedStore implements RawStore, Configurable {
       throws InvalidObjectException, MetaException {
     // TODO constraintCache
     rawStore.addForeignKeys(fks);
+  }
+
+  @Override
+  public void addUniqueConstraints(List<SQLUniqueConstraint> uks)
+      throws InvalidObjectException, MetaException {
+    // TODO constraintCache
+    rawStore.addUniqueConstraints(uks);
+  }
+
+  @Override
+  public void addNotNullConstraints(List<SQLNotNullConstraint> nns)
+      throws InvalidObjectException, MetaException {
+    // TODO constraintCache
+    rawStore.addNotNullConstraints(nns);
   }
 
   @Override
