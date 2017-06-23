@@ -1089,6 +1089,11 @@ public class HiveConf extends Configuration {
         "How many rows in the right-most join operand Hive should buffer before emitting the join result."),
     HIVEJOINCACHESIZE("hive.join.cache.size", 25000,
         "How many rows in the joining tables (except the streaming table) should be cached in memory."),
+    HIVE_PUSH_RESIDUAL_INNER("hive.join.inner.residual", false,
+        "Whether to push non-equi filter predicates within inner joins. This can improve efficiency in "
+        + "the evaluation of certain joins, since we will not be emitting rows which are thrown away by "
+        + "a Filter operator straight away. However, currently vectorization does not support them, thus "
+        + "enabling it is only recommended when vectorization is disabled."),
 
     // CBO related
     HIVE_CBO_ENABLED("hive.cbo.enable", true, "Flag to control enabling Cost Based Optimizations using Calcite framework."),
@@ -1656,9 +1661,9 @@ public class HiveConf extends Configuration {
         "If the skew information is correctly stored in the metadata, hive.optimize.skewjoin.compiletime\n" +
         "would change the query plan to take care of it, and hive.optimize.skewjoin will be a no-op."),
 
-    HIVE_SHARED_SCAN_OPTIMIZATION("hive.optimize.shared.scan", true,
-        "Whether to enable shared scan optimizer. The optimizer finds scan operator over the same table\n" +
-        "in the query plan and merges them if they meet some preconditions."),
+    HIVE_SHARED_WORK_OPTIMIZATION("hive.optimize.shared.work", true,
+        "Whether to enable shared work optimizer. The optimizer finds scan operator over the same table\n" +
+        "and follow-up operators in the query plan and merges them if they meet some preconditions."),
 
     // CTE
     HIVE_CTE_MATERIALIZE_THRESHOLD("hive.optimize.cte.materialize.threshold", -1,
@@ -2827,6 +2832,15 @@ public class HiveConf extends Configuration {
         "1. chosen : use VectorUDFAdaptor for a small set of UDFs that were choosen for good performance\n" +
         "2. all    : use VectorUDFAdaptor for all UDFs"
     ),
+    HIVE_VECTORIZATION_COMPLEX_TYPES_ENABLED("hive.vectorized.complex.types.enabled", true,
+        "This flag should be set to true to enable vectorization\n" +
+        "of expressions with complex types.\n" +
+        "The default value is true."),
+    HIVE_VECTORIZATION_GROUPBY_COMPLEX_TYPES_ENABLED("hive.vectorized.groupby.complex.types.enabled", true,
+        "This flag should be set to true to enable group by vectorization\n" +
+        "of aggregations that use complex types.\n",
+        "For example, AVG uses a complex type (STRUCT) for partial aggregation results" +
+        "The default value is true."),
 
     HIVE_TYPE_CHECK_ON_INSERT("hive.typecheck.on.insert", true, "This property has been extended to control "
         + "whether to check, convert, and normalize partition value to conform to its column type in "
@@ -2963,7 +2977,7 @@ public class HiveConf extends Configuration {
         "LLAP IO memory usage; 'cache' (the default) uses data and metadata cache with a\n" +
         "custom off-heap allocator, 'none' doesn't use either (this mode may result in\n" +
         "significant performance degradation)"),
-    LLAP_ALLOCATOR_MIN_ALLOC("hive.llap.io.allocator.alloc.min", "256Kb", new SizeValidator(),
+    LLAP_ALLOCATOR_MIN_ALLOC("hive.llap.io.allocator.alloc.min", "16Kb", new SizeValidator(),
         "Minimum allocation possible from LLAP buddy allocator. Allocations below that are\n" +
         "padded to minimum allocation. For ORC, should generally be the same as the expected\n" +
         "compression buffer size, or next lowest power of 2. Must be a power of 2."),
@@ -2990,6 +3004,14 @@ public class HiveConf extends Configuration {
     LLAP_ALLOCATOR_MAPPED_PATH("hive.llap.io.allocator.mmap.path", "/tmp",
         new WritableDirectoryValidator(),
         "The directory location for mapping NVDIMM/NVMe flash storage into the ORC low-level cache."),
+    LLAP_ALLOCATOR_DISCARD_METHOD("hive.llap.io.allocator.discard.method", "both",
+        new StringSet("freelist", "brute", "both"),
+        "Which method to use to force-evict blocks to deal with fragmentation:\n" +
+        "freelist - use half-size free list (discards less, but also less reliable); brute -\n" +
+        "brute force, discard whatever we can; both - first try free list, then brute force."),
+    LLAP_ALLOCATOR_DEFRAG_HEADROOM("hive.llap.io.allocator.defrag.headroom", "1Mb",
+        "How much of a headroom to leave to allow allocator more flexibility to defragment.\n" +
+        "The allocator would further cap it to a fraction of total memory."),
     LLAP_USE_LRFU("hive.llap.io.use.lrfu", true,
         "Whether ORC low-level cache should use LRFU cache policy instead of default (FIFO)."),
     LLAP_LRFU_LAMBDA("hive.llap.io.lrfu.lambda", 0.01f,
