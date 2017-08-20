@@ -171,7 +171,7 @@ import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveUnion;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveAggregateJoinTransposeRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveAggregateProjectMergeRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveAggregatePullUpConstantsRule;
-import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveDruidProjectFilterTransposeRule;
+import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveAggregateReduceRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveExceptRewriteRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveExpandDistinctAggregatesRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveFilterAggregateTransposeRule;
@@ -199,6 +199,7 @@ import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveReduceExpressionsRu
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveReduceExpressionsWithStatsRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveRelDecorrelator;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveRelFieldTrimmer;
+import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveRemoveSqCountCheck;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveRulesRegistry;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveSemiJoinRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveSortJoinReduceRule;
@@ -211,7 +212,7 @@ import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveSubQueryRemoveRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveUnionMergeRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveUnionPullUpConstantsRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.rules.HiveWindowingFixRule;
-import org.apache.hadoop.hive.ql.optimizer.calcite.rules.views.HiveMaterializedViewFilterScanRule;
+import org.apache.hadoop.hive.ql.optimizer.calcite.rules.views.HiveMaterializedViewRule;
 import org.apache.hadoop.hive.ql.optimizer.calcite.translator.ASTBuilder;
 import org.apache.hadoop.hive.ql.optimizer.calcite.translator.ASTConverter;
 import org.apache.hadoop.hive.ql.optimizer.calcite.translator.HiveOpConverter;
@@ -1378,7 +1379,7 @@ public class CalcitePlanner extends SemanticAnalyzer {
       //Remove subquery
       LOG.debug("Plan before removing subquery:\n" + RelOptUtil.toString(calciteGenPlan));
       calciteGenPlan = hepPlan(calciteGenPlan, false, mdProvider.getMetadataProvider(), null,
-              HiveSubQueryRemoveRule.REL_NODE);
+              new HiveSubQueryRemoveRule(conf));
       LOG.debug("Plan just after removing subquery:\n" + RelOptUtil.toString(calciteGenPlan));
 
       calciteGenPlan = HiveRelDecorrelator.decorrelateQuery(calciteGenPlan);
@@ -1487,7 +1488,8 @@ public class CalcitePlanner extends SemanticAnalyzer {
             planner.addMaterialization(materialization);
           }
           // Add view-based rewriting rules to planner
-          planner.addRule(HiveMaterializedViewFilterScanRule.INSTANCE);
+          planner.addRule(HiveMaterializedViewRule.INSTANCE_PROJECT_FILTER);
+          planner.addRule(HiveMaterializedViewRule.INSTANCE_FILTER);
           // Optimize plan
           planner.setRoot(calciteOptimizedPlan);
           calciteOptimizedPlan = planner.findBestExp();
@@ -1523,9 +1525,21 @@ public class CalcitePlanner extends SemanticAnalyzer {
       // run this rule at later stages, since many calcite rules cant deal with semijoin
       if (conf.getBoolVar(ConfVars.SEMIJOIN_CONVERSION)) {
         perfLogger.PerfLogBegin(this.getClass().getName(), PerfLogger.OPTIMIZER);
-        calciteOptimizedPlan = hepPlan(calciteOptimizedPlan, false, mdProvider.getMetadataProvider(), null, HiveSemiJoinRule.INSTANCE);
+        calciteOptimizedPlan = hepPlan(calciteOptimizedPlan, false, mdProvider.getMetadataProvider(), null,
+                HiveSemiJoinRule.INSTANCE_PROJECT, HiveSemiJoinRule.INSTANCE_AGGREGATE);
         perfLogger.PerfLogEnd(this.getClass().getName(), PerfLogger.OPTIMIZER, "Calcite: Semijoin conversion");
       }
+
+      // 8. Get rid of sq_count_check if group by key is constant (HIVE-)
+      if (conf.getBoolVar(ConfVars.HIVE_REMOVE_SQ_COUNT_CHECK)) {
+        perfLogger.PerfLogBegin(this.getClass().getName(), PerfLogger.OPTIMIZER);
+        calciteOptimizedPlan =
+            hepPlan(calciteOptimizedPlan, false, mdProvider.getMetadataProvider(), null,
+                HiveRemoveSqCountCheck.INSTANCE);
+        perfLogger.PerfLogEnd(this.getClass().getName(), PerfLogger.OPTIMIZER,
+            "Calcite: Removing sq_count_check UDF ");
+      }
+
 
 
       // 8. Run rule to fix windowing issue when it is done over
@@ -1542,7 +1556,7 @@ public class CalcitePlanner extends SemanticAnalyzer {
       calciteOptimizedPlan = hepPlan(calciteOptimizedPlan, false, mdProvider.getMetadataProvider(), null,
               HepMatchOrder.BOTTOM_UP,
               DruidRules.FILTER,
-              HiveDruidProjectFilterTransposeRule.INSTANCE,
+              DruidRules.PROJECT_FILTER_TRANSPOSE,
               DruidRules.AGGREGATE_FILTER_TRANSPOSE,
               DruidRules.AGGREGATE_PROJECT,
               DruidRules.PROJECT,
@@ -1682,6 +1696,7 @@ public class CalcitePlanner extends SemanticAnalyzer {
       rules.add(HiveReduceExpressionsRule.PROJECT_INSTANCE);
       rules.add(HiveReduceExpressionsRule.FILTER_INSTANCE);
       rules.add(HiveReduceExpressionsRule.JOIN_INSTANCE);
+      rules.add(HiveAggregateReduceRule.INSTANCE);
       if (conf.getBoolVar(HiveConf.ConfVars.HIVEPOINTLOOKUPOPTIMIZER)) {
         rules.add(new HivePointLookupOptimizerRule.FilterCondition(minNumORClauses));
         rules.add(new HivePointLookupOptimizerRule.JoinCondition(minNumORClauses));
@@ -3448,7 +3463,7 @@ public class CalcitePlanner extends SemanticAnalyzer {
 
         w = cluster.getRexBuilder().makeOver(calciteAggFnRetType, calciteAggFn, calciteAggFnArgs,
             partitionKeys, ImmutableList.<RexFieldCollation> copyOf(orderKeys), lowerBound,
-            upperBound, isRows, true, false);
+            upperBound, isRows, true, false, hiveAggInfo.m_distinct);
       } else {
         // TODO: Convert to Semantic Exception
         throw new RuntimeException("Unsupported window Spec");

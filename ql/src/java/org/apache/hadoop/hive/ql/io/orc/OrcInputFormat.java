@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -641,6 +642,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       // The table properties are copied to job conf at HiveInputFormat::addSplitsForGroup(),
       // & therefore we should be able to retrieve them here and determine appropriate behavior.
       // Note that this will be meaningless for non-acid tables & will be set to null.
+      //this is set by Utilities.copyTablePropertiesToConf()
       boolean isTableTransactional = conf.getBoolean(hive_metastoreConstants.TABLE_IS_TRANSACTIONAL, false);
       String transactionalProperties = conf.get(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES);
       this.acidOperationalProperties = isTableTransactional ?
@@ -972,16 +974,21 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       List<OrcSplit> splits = Lists.newArrayList();
       for (HdfsFileStatusWithId file : fileStatuses) {
         FileStatus fileStatus = file.getFileStatus();
-        if (fileStatus.getLen() != 0) {
+        long logicalLen = AcidUtils.getLogicalLength(fs, fileStatus);
+        if (logicalLen != 0) {
           Object fileKey = file.getFileId();
           if (fileKey == null && allowSyntheticFileIds) {
             fileKey = new SyntheticFileId(fileStatus);
           }
           TreeMap<Long, BlockLocation> blockOffsets = SHIMS.getLocationsWithOffset(fs, fileStatus);
           for (Map.Entry<Long, BlockLocation> entry : blockOffsets.entrySet()) {
+            if(entry.getKey() + entry.getValue().getLength() > logicalLen) {
+              //don't create splits for anything past logical EOF
+              continue;
+            }
             OrcSplit orcSplit = new OrcSplit(fileStatus.getPath(), fileKey, entry.getKey(),
                 entry.getValue().getLength(), entry.getValue().getHosts(), null, isOriginal, true,
-                deltas, -1, fileStatus.getLen());
+                deltas, -1, logicalLen);
             splits.add(orcSplit);
           }
         }
@@ -1002,13 +1009,13 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
    * ACID split strategy is used when there is no base directory (when transactions are enabled).
    */
   static class ACIDSplitStrategy implements SplitStrategy<OrcSplit> {
-    Path dir;
-    List<DeltaMetaData> deltas;
-    boolean[] covered;
-    int numBuckets;
-    AcidOperationalProperties acidOperationalProperties;
+    private Path dir;
+    private List<DeltaMetaData> deltas;
+    private boolean[] covered;
+    private int numBuckets;
+    private AcidOperationalProperties acidOperationalProperties;
 
-    public ACIDSplitStrategy(Path dir, int numBuckets, List<DeltaMetaData> deltas, boolean[] covered,
+    ACIDSplitStrategy(Path dir, int numBuckets, List<DeltaMetaData> deltas, boolean[] covered,
         AcidOperationalProperties acidOperationalProperties) {
       this.dir = dir;
       this.numBuckets = numBuckets;
@@ -1027,18 +1034,15 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       // with valid user payload data has already been considered as base for the covered buckets.
       // Hence, the uncovered buckets do not have any relevant data and we can just ignore them.
       if (acidOperationalProperties != null && acidOperationalProperties.isSplitUpdate()) {
-        return splits; // return an empty list.
+        return Collections.emptyList();
       }
 
       // Generate a split for any buckets that weren't covered.
       // This happens in the case where a bucket just has deltas and no
       // base.
       if (!deltas.isEmpty()) {
-        for (int b = 0; b < numBuckets; ++b) {
-          if (!covered[b]) {
-            splits.add(new OrcSplit(dir, null, b, 0, new String[0], null, false, false, deltas, -1, -1));
-          }
-        }
+        //since HIVE-17089 if here, then it's not an acid table so there should never be any deltas
+        throw new IllegalStateException("Found unexpected deltas: " + deltas + " in " + dir);
       }
       return splits;
     }
@@ -1133,7 +1137,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
             if (val == null || val) {
               try {
                 List<HdfsFileStatusWithId> insertDeltaFiles =
-                    SHIMS.listLocatedHdfsStatus(fs, parsedDelta.getPath(), AcidUtils.hiddenFileFilter);
+                    SHIMS.listLocatedHdfsStatus(fs, parsedDelta.getPath(), AcidUtils.bucketFileFilter);
                 for (HdfsFileStatusWithId fileId : insertDeltaFiles) {
                   baseFiles.add(new AcidBaseFileInfo(fileId, AcidUtils.AcidBaseFileType.INSERT_DELTA));
                 }
@@ -1149,7 +1153,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
               }
             }
             // Fall back to regular API and create statuses without ID.
-            List<FileStatus> children = HdfsUtils.listLocatedStatus(fs, parsedDelta.getPath(), AcidUtils.hiddenFileFilter);
+            List<FileStatus> children = HdfsUtils.listLocatedStatus(fs, parsedDelta.getPath(), AcidUtils.bucketFileFilter);
             for (FileStatus child : children) {
               HdfsFileStatusWithId fileId = AcidUtils.createOriginalObj(null, child);
               baseFiles.add(new AcidBaseFileInfo(fileId, AcidUtils.AcidBaseFileType.INSERT_DELTA));
@@ -1402,7 +1406,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         populateAndCacheStripeDetails();
         boolean[] includeStripe = null;
         // We can't eliminate stripes if there are deltas because the
-        // deltas may change the rows making them match the predicate.
+        // deltas may change the rows making them match the predicate. todo: See HIVE-14516.
         if ((deltas == null || deltas.isEmpty()) && context.sarg != null) {
           String[] colNames =
               extractNeededColNames((readerTypes == null ? fileTypes : readerTypes),
@@ -1516,7 +1520,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         Reader orcReader = OrcFile.createReader(file.getPath(),
             OrcFile.readerOptions(context.conf)
                 .filesystem(fs)
-                .maxLength(file.getLen()));
+                .maxLength(AcidUtils.getLogicalLength(fs, file)));
         orcTail = new OrcTail(orcReader.getFileTail(), orcReader.getSerializedFileFooter(),
             file.getModificationTime());
         if (context.cacheStripeDetails) {
@@ -1677,7 +1681,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         // independent split strategies for them. There is a global flag 'isOriginal' that is set
         // on a per split strategy basis and it has to be same for all the files in that strategy.
         List<SplitStrategy<?>> splitStrategies = determineSplitStrategies(combinedCtx, context, adi.fs,
-            adi.splitPath, adi.acidInfo, adi.baseFiles, adi.parsedDeltas, readerTypes, ugi,
+            adi.splitPath, adi.baseFiles, adi.parsedDeltas, readerTypes, ugi,
             allowSyntheticFileIds);
 
         for (SplitStrategy<?> splitStrategy : splitStrategies) {
@@ -1927,7 +1931,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       } else {
         root = path.getParent().getParent();
       }
-    } else {
+    } else {//here path is a delta/ but above it's a partition/
       root = path;
     }
 
@@ -1947,7 +1951,23 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     final Configuration conf = options.getConfiguration();
 
     final Reader reader = OrcInputFormat.createOrcReaderForSplit(conf, split);
-    final int bucket = OrcInputFormat.getBucketForSplit(conf, split);
+    OrcRawRecordMerger.Options mergerOptions = new OrcRawRecordMerger.Options().isCompacting(false);
+    mergerOptions.rootPath(root);
+    final int bucket;
+    if (split.hasBase()) {
+      AcidOutputFormat.Options acidIOOptions =
+        AcidUtils.parseBaseOrDeltaBucketFilename(split.getPath(), conf);
+      if(acidIOOptions.getBucketId() < 0) {
+        LOG.warn("Can't determine bucket ID for " + split.getPath() + "; ignoring");
+      }
+      bucket = acidIOOptions.getBucketId();
+      if(split.isOriginal()) {
+        mergerOptions.copyIndex(acidIOOptions.getCopyNumber()).bucketPath(split.getPath());
+      }
+    } else {
+      bucket = (int) split.getStart();
+    }
+
     final Reader.Options readOptions = OrcInputFormat.createOptionsForReader(conf);
     readOptions.range(split.getStart(), split.getLength());
 
@@ -1956,7 +1976,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       new ValidReadTxnList(txnString);
     final OrcRawRecordMerger records =
         new OrcRawRecordMerger(conf, true, reader, split.isOriginal(), bucket,
-            validTxnList, readOptions, deltas);
+            validTxnList, readOptions, deltas, mergerOptions);
     return new RowReader<OrcStruct>() {
       OrcStruct innerRecord = records.createValue();
 
@@ -2008,20 +2028,20 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       }
     };
   }
-
-  static Path findOriginalBucket(FileSystem fs,
+  private static Path findOriginalBucket(FileSystem fs,
                                  Path directory,
                                  int bucket) throws IOException {
     for(FileStatus stat: fs.listStatus(directory)) {
-      String name = stat.getPath().getName();
-      String numberPart = name.substring(0, name.indexOf('_'));
-      if (org.apache.commons.lang3.StringUtils.isNumeric(numberPart) &&
-          Integer.parseInt(numberPart) == bucket) {
+      if(stat.getLen() <= 0) {
+        continue;
+      }
+      AcidOutputFormat.Options bucketInfo =
+        AcidUtils.parseBaseOrDeltaBucketFilename(stat.getPath(), fs.getConf());
+      if(bucketInfo.getBucketId() == bucket) {
         return stat.getPath();
       }
     }
-    throw new IllegalArgumentException("Can't find bucket " + bucket + " in " +
-        directory);
+    throw new IllegalArgumentException("Can't find bucket " + bucket + " in " + directory);
   }
 
   static Reader.Options createOptionsForReader(Configuration conf) {
@@ -2052,14 +2072,6 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       reader = null;
     }
     return reader;
-  }
-
-  static int getBucketForSplit(Configuration conf, OrcSplit orcSplit) {
-    if (orcSplit.hasBase()) {
-      return AcidUtils.parseBaseOrDeltaBucketFilename(orcSplit.getPath(), conf).getBucket();
-    } else {
-      return (int) orcSplit.getStart();
-    }
   }
 
   public static boolean[] pickStripesViaTranslatedSarg(SearchArgument sarg,
@@ -2134,7 +2146,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
   @VisibleForTesting
   static List<SplitStrategy<?>> determineSplitStrategies(CombinedCtx combinedCtx, Context context,
-      FileSystem fs, Path dir, AcidUtils.Directory dirInfo,
+      FileSystem fs, Path dir,
       List<AcidBaseFileInfo> baseFiles,
       List<ParsedDelta> parsedDeltas,
       List<OrcProto.Type> readerTypes,
@@ -2145,7 +2157,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
     // When no baseFiles, we will just generate a single split strategy and return.
     List<HdfsFileStatusWithId> acidSchemaFiles = new ArrayList<HdfsFileStatusWithId>();
     if (baseFiles.isEmpty()) {
-      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir, dirInfo,
+      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir,
           acidSchemaFiles, false, parsedDeltas, readerTypes, ugi, allowSyntheticFileIds);
       if (splitStrategy != null) {
         splitStrategies.add(splitStrategy);
@@ -2165,7 +2177,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
     // Generate split strategy for non-acid schema original files, if any.
     if (!originalSchemaFiles.isEmpty()) {
-      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir, dirInfo,
+      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir,
           originalSchemaFiles, true, parsedDeltas, readerTypes, ugi, allowSyntheticFileIds);
       if (splitStrategy != null) {
         splitStrategies.add(splitStrategy);
@@ -2174,7 +2186,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
     // Generate split strategy for acid schema files, if any.
     if (!acidSchemaFiles.isEmpty()) {
-      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir, dirInfo,
+      splitStrategy = determineSplitStrategy(combinedCtx, context, fs, dir,
           acidSchemaFiles, false, parsedDeltas, readerTypes, ugi, allowSyntheticFileIds);
       if (splitStrategy != null) {
         splitStrategies.add(splitStrategy);
@@ -2186,7 +2198,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
 
   @VisibleForTesting
   static SplitStrategy<?> determineSplitStrategy(CombinedCtx combinedCtx, Context context,
-      FileSystem fs, Path dir, AcidUtils.Directory dirInfo,
+      FileSystem fs, Path dir,
       List<HdfsFileStatusWithId> baseFiles,
       boolean isOriginal,
       List<ParsedDelta> parsedDeltas,
@@ -2202,8 +2214,7 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
         totalFileSize += child.getFileStatus().getLen();
         AcidOutputFormat.Options opts = AcidUtils.parseBaseOrDeltaBucketFilename
             (child.getFileStatus().getPath(), context.conf);
-        opts.writingBase(true);
-        int b = opts.getBucket();
+        int b = opts.getBucketId();
         // If the bucket is in the valid range, mark it as covered.
         // I wish Hive actually enforced bucketing all of the time.
         if (b >= 0 && b < covered.length) {
@@ -2261,8 +2272,11 @@ public class OrcInputFormat implements InputFormat<NullWritable, OrcStruct>,
       }
       reader = OrcFile.createReader(bucketFile, OrcFile.readerOptions(conf));
     }
+    OrcRawRecordMerger.Options mergerOptions = new OrcRawRecordMerger.Options()
+      .isCompacting(true)
+      .rootPath(baseDirectory);
     return new OrcRawRecordMerger(conf, collapseEvents, reader, isOriginal,
-        bucket, validTxnList, new Reader.Options(), deltaDirectory);
+        bucket, validTxnList, new Reader.Options(), deltaDirectory, mergerOptions);
   }
 
   /**
