@@ -15,19 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hive.ql.optimizer.calcite;
 
-package org.apache.hadoop.hive.ql.exec;
+import org.apache.calcite.rel.RelNode;
 
-import org.apache.hadoop.hive.common.classification.InterfaceAudience;
-import org.apache.hadoop.hive.common.classification.InterfaceStability;
+import java.util.Set;
 
-/**
- * exception class, thrown when udf arguments have wrong length.
- */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
-public class UDFArgumentLengthException extends UDFArgumentException {
-  public UDFArgumentLengthException(String message) {
-    super(message);
+public class HiveConfPlannerContext{
+
+  private boolean isCorrelatedColumns;
+
+
+  public HiveConfPlannerContext(boolean isCorrelatedColumns) {
+    this.isCorrelatedColumns = isCorrelatedColumns;
   }
+
+  public boolean getIsCorrelatedColumns() { return isCorrelatedColumns;}
 }
