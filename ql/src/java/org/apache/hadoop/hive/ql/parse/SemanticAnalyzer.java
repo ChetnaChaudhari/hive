@@ -92,6 +92,7 @@ import org.apache.hadoop.hive.ql.exec.FunctionInfo;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.OperatorFactory;
 import org.apache.hadoop.hive.ql.exec.RecordReader;
@@ -402,10 +403,13 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   @Override
-  protected void reset(boolean clearPartsCache) {
+  protected void reset(boolean clearCache) {
     super.reset(true);
-    if(clearPartsCache) {
+    if(clearCache) {
       prunedPartitions.clear();
+      if (ctx != null) {
+        ctx.getOpContext().getColStatsCache().clear();
+      }
 
       //When init(true) combine with genResolvedParseTree, it will generate Resolved Parse tree from syntax tree
       //ReadEntity created under these conditions should be all relevant to the syntax tree even the ones without parents
@@ -7374,9 +7378,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
   }
 
   // Check constraints on acid tables.  This includes
-  // * no insert overwrites
-  // * no use of vectorization
-  // * turns off reduce deduplication optimization, as that sometimes breaks acid
   // * Check that the table is bucketed
   // * Check that the table is not sorted
   // This method assumes you have already decided that this is an Acid write.  Don't call it if
@@ -7394,9 +7395,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     */
     conf.set(AcidUtils.CONF_ACID_KEY, "true");
 
-    if (table.getNumBuckets() < 1) {
-      throw new SemanticException(ErrorMsg.ACID_OP_ON_NONACID_TABLE, table.getTableName());
-    }
     if (table.getSortCols() != null && table.getSortCols().size() > 0) {
       throw new SemanticException(ErrorMsg.ACID_NO_SORTED_BUCKETS, table.getTableName());
     }
@@ -10550,10 +10548,15 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     // Recurse over the subqueries to fill the subquery part of the plan
     for (String alias : qb.getSubqAliases()) {
       QBExpr qbexpr = qb.getSubqForAlias(alias);
-      Operator operator = genPlan(qb, qbexpr);
+      Operator<?> operator = genPlan(qb, qbexpr);
       aliasToOpInfo.put(alias, operator);
       if (qb.getViewToTabSchema().containsKey(alias)) {
         // we set viewProjectToTableSchema so that we can leverage ColumnPruner.
+        if (operator instanceof LimitOperator) {
+          // If create view has LIMIT operator, this can happen
+          // Fetch parent operator
+          operator = operator.getParentOperators().get(0);
+        }
         if (operator instanceof SelectOperator) {
           if (this.viewProjectToTableSchema == null) {
             this.viewProjectToTableSchema = new LinkedHashMap<>();

@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -58,7 +59,10 @@ import javax.jdo.Query;
 import javax.jdo.Transaction;
 import javax.jdo.datastore.DataStoreCache;
 import javax.jdo.identity.IntIdentity;
+import javax.sql.DataSource;
 
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configurable;
@@ -69,9 +73,6 @@ import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
-import org.apache.hadoop.hive.common.metrics.common.Metrics;
-import org.apache.hadoop.hive.common.metrics.common.MetricsConstant;
-import org.apache.hadoop.hive.common.metrics.common.MetricsFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.MetaStoreDirectSql.SqlFilterForPushdown;
@@ -97,6 +98,8 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
+import org.apache.hadoop.hive.metastore.api.NotificationEventsCountRequest;
+import org.apache.hadoop.hive.metastore.api.NotificationEventsCountResponse;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PartitionEventType;
@@ -122,6 +125,10 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownPartitionException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.datasource.DataSourceProvider;
+import org.apache.hadoop.hive.metastore.datasource.DataSourceProviderFactory;
+import org.apache.hadoop.hive.metastore.metrics.Metrics;
+import org.apache.hadoop.hive.metastore.metrics.MetricsConstants;
 import org.apache.hadoop.hive.metastore.model.MColumnDescriptor;
 import org.apache.hadoop.hive.metastore.model.MConstraint;
 import org.apache.hadoop.hive.metastore.model.MDBPrivilege;
@@ -241,6 +248,7 @@ public class ObjectStore implements RawStore, Configurable {
   private Transaction currentTransaction = null;
   private TXN_STATUS transactionStatus = TXN_STATUS.NO_STATE;
   private Pattern partitionValidationPattern;
+  private Counter directSqlErrors;
 
   /**
    * A Autocloseable wrapper around Query class to pass the Query object to the caller and let the caller release
@@ -319,6 +327,13 @@ public class ObjectStore implements RawStore, Configurable {
         partitionValidationPattern = Pattern.compile(partitionValidationRegex);
       } else {
         partitionValidationPattern = null;
+      }
+
+      // Note, if metrics have not been initialized this will return null, which means we aren't
+      // using metrics.  Thus we should always check whether this is non-null before using.
+      MetricRegistry registry = Metrics.getRegistry();
+      if (registry != null) {
+        directSqlErrors = Metrics.getOrCreateCounter(MetricsConstants.DIRECTSQL_ERRORS);
       }
 
       if (!isInitialized) {
@@ -532,10 +547,29 @@ public class ObjectStore implements RawStore, Configurable {
 
   private static synchronized PersistenceManagerFactory getPMF() {
     if (pmf == null) {
-      pmf = JDOHelper.getPersistenceManagerFactory(prop);
+
+      HiveConf conf = new HiveConf(ObjectStore.class);
+      DataSourceProvider dsp = DataSourceProviderFactory.getDataSourceProvider(conf);
+      if (dsp == null) {
+        pmf = JDOHelper.getPersistenceManagerFactory(prop);
+      } else {
+        try {
+          DataSource ds = dsp.create(conf);
+          Map<Object, Object> dsProperties = new HashMap<>();
+          //Any preexisting datanucleus property should be passed along
+          dsProperties.putAll(prop);
+          dsProperties.put("datanucleus.ConnectionFactory", ds);
+          dsProperties.put("javax.jdo.PersistenceManagerFactoryClass",
+              "org.datanucleus.api.jdo.JDOPersistenceManagerFactory");
+          pmf = JDOHelper.getPersistenceManagerFactory(dsProperties);
+        } catch (SQLException e) {
+          LOG.warn("Could not create PersistenceManagerFactory using " +
+              "connection pool properties, will fall back", e);
+          pmf = JDOHelper.getPersistenceManagerFactory(prop);
+        }
+      }
       DataStoreCache dsc = pmf.getDataStoreCache();
       if (dsc != null) {
-        HiveConf conf = new HiveConf(ObjectStore.class);
         String objTypes = HiveConf.getVar(conf, HiveConf.ConfVars.METASTORE_CACHE_PINOBJTYPES);
         LOG.info("Setting MetaStore object pin classes with hive.metastore.cache.pinobjtypes=\"" + objTypes + "\"");
         if (objTypes != null && objTypes.length() > 0) {
@@ -2822,13 +2856,8 @@ public class ObjectStore implements RawStore, Configurable {
         start = doTrace ? System.nanoTime() : 0;
       }
 
-      Metrics metrics = MetricsFactory.getInstance();
-      if (metrics != null) {
-        try {
-          metrics.incrementCounter(MetricsConstant.DIRECTSQL_ERRORS);
-        } catch (Exception e) {
-          LOG.warn("Error reporting Direct SQL errors to metrics system", e);
-        }
+      if (directSqlErrors != null) {
+        directSqlErrors.inc();
       }
 
       doUseDirectSql = false;
@@ -8307,6 +8336,27 @@ public class ObjectStore implements RawStore, Configurable {
       }
       commited = commitTransaction();
       return new CurrentNotificationEventId(id);
+    } finally {
+      rollbackAndCleanup(commited, query);
+    }
+  }
+
+  @Override
+  public NotificationEventsCountResponse getNotificationEventsCount(NotificationEventsCountRequest rqst) {
+    Long result = 0L;
+    boolean commited = false;
+    Query query = null;
+    try {
+      openTransaction();
+      long fromEventId = rqst.getFromEventId();
+      String inputDbName = rqst.getDbName();
+      String queryStr = "select count(eventId) from " + MNotificationLog.class.getName()
+                + " where eventId > fromEventId && dbName == inputDbName";
+      query = pm.newQuery(queryStr);
+      query.declareParameters("java.lang.Long fromEventId, java.lang.String inputDbName");
+      result = (Long) query.execute(fromEventId, inputDbName);
+      commited = commitTransaction();
+      return new NotificationEventsCountResponse(result.longValue());
     } finally {
       rollbackAndCleanup(commited, query);
     }
